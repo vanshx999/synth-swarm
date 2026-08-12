@@ -1,194 +1,298 @@
-import { SwarmPlan, SwarmTask, AgentResult, SwarmState, LLMProvider } from '../types';
-import { createProviders, ProviderConfig } from './providers';
+import { Task, Plan, Gap, Report, SwarmEvent, SwarmEventCallback, LLMProvider } from '../types';
+
+const FALLBACK_REASONING =
+  'Split into historical context, technical mechanism, current debates, and counterarguments — chosen to cover both factual grounding and contested framing.';
+
+/**
+ * Extract the first balanced JSON object/array from a blob of LLM output.
+ * Strips markdown code fences and tolerates surrounding prose.
+ */
+function extractJson(text: string): string | null {
+  const cleaned = text.replace(/```(?:json)?/gi, '');
+  let start = -1;
+  for (let i = 0; i < cleaned.length; i++) {
+    if (cleaned[i] === '{' || cleaned[i] === '[') {
+      start = i;
+      break;
+    }
+  }
+  if (start === -1) return null;
+
+  const open = cleaned[start];
+  const close = open === '{' ? '}' : ']';
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === open) depth++;
+    else if (ch === close) {
+      depth--;
+      if (depth === 0) return cleaned.slice(start, i + 1);
+    }
+  }
+  return null;
+}
 
 export class SwarmEngine {
-  private providers: LLMProvider[];
-  private state: SwarmState;
-  private onUpdate: (state: SwarmState) => void;
+  private provider: LLMProvider;
+  private onEvent: SwarmEventCallback;
+  private maxLoops = 3;
 
-  constructor(config: ProviderConfig, onUpdate: (state: SwarmState) => void) {
-    this.providers = createProviders(config);
-    this.onUpdate = onUpdate;
-    this.state = this.initialState();
+  constructor(provider: LLMProvider, onEvent: SwarmEventCallback) {
+    this.provider = provider;
+    this.onEvent = onEvent;
   }
 
-  private initialState(): SwarmState {
+  private emit(event: SwarmEvent): void {
+    this.onEvent(event);
+  }
+
+  /**
+   * Decompose a topic into 5-7 tasks as a JSON Plan. Falls back to a fixed
+   * plan when the LLM output cannot be parsed.
+   */
+  async plan(topic: string): Promise<Plan> {
+    const prompt = `You are a research planner. Decompose the topic "${topic}" into 5 to 7 focused research tasks.
+
+Output exactly one JSON object in this shape (no prose, no markdown):
+{
+  "tasks": [ { "id": "string", "title": "string" } ],
+  "reasoning": "string"
+}
+Each task id must be unique. "reasoning" should briefly explain how the tasks cover the topic.`;
+
+    let response: string;
+    try {
+      response = await this.provider.runAgent('planner', prompt);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown planning error';
+      this.emit({ type: 'error', message });
+      const plan = this.fallbackPlan(topic);
+      this.emit({ type: 'plan_ready', plan });
+      return plan;
+    }
+
+    const plan = this.parsePlan(response, topic);
+    this.emit({ type: 'plan_ready', plan });
+    return plan;
+  }
+
+  private parsePlan(text: string, topic: string): Plan {
+    const json = extractJson(text);
+    if (json) {
+      try {
+        const parsed = JSON.parse(json);
+        if (parsed && Array.isArray(parsed.tasks)) {
+          const tasks: Task[] = parsed.tasks
+            .map((t: unknown, i: number): Task | null => {
+              if (!t || typeof t !== 'object') return null;
+              const obj = t as Record<string, unknown>;
+              return {
+                id: typeof obj.id === 'string' ? obj.id : `t${i + 1}`,
+                title: typeof obj.title === 'string' ? obj.title : `Research task ${i + 1}`,
+                status: 'pending',
+              };
+            })
+            .filter((t: Task | null): t is Task => t !== null);
+
+          if (tasks.length > 0) {
+            return {
+              tasks,
+              reasoning: typeof parsed.reasoning === 'string' ? parsed.reasoning : '',
+            };
+          }
+        }
+      } catch {
+        // fall through to fallback plan
+      }
+    }
+    return this.fallbackPlan(topic);
+  }
+
+  private fallbackPlan(topic: string): Plan {
     return {
-      plan: null,
-      results: new Map(),
-      currentLoop: 0,
-      maxLoops: 3,
-      status: 'idle',
+      tasks: [
+        { id: 't1', title: `Historical context of ${topic}`, status: 'pending' },
+        { id: 't2', title: `Technical mechanism of ${topic}`, status: 'pending' },
+        { id: 't3', title: `Current debates around ${topic}`, status: 'pending' },
+        { id: 't4', title: `Counterarguments to ${topic}`, status: 'pending' },
+        { id: 't5', title: `Synthesis of ${topic}`, status: 'pending' },
+      ],
+      reasoning: FALLBACK_REASONING,
     };
   }
 
-  getState(): SwarmState {
-    return { ...this.state, results: new Map(this.state.results) };
+  /**
+   * Run all tasks IN PARALLEL, emitting a task_update event for every
+   * transition (pending -> working -> done/failed).
+   */
+  async swarmRunner(tasks: Task[]): Promise<void> {
+    await Promise.all(tasks.map((task) => this.runTask(task)));
   }
 
-  async run(topic: string): Promise<string> {
-    this.state.status = 'planning';
-    this.emit();
-
-    // Step 1: Plan
-    const plan = await this.plan(topic);
-    this.state.plan = plan;
-    this.state.status = 'running';
-    this.emit();
-
-    // Step 2: Run loops
-    while (this.state.currentLoop < this.state.maxLoops) {
-      await this.executeSwarm(plan);
-      
-      this.state.status = 'synthesizing';
-      this.emit();
-      
-      const report = await this.synthesize(plan);
-      this.state.finalReport = report;
-      
-      // Check if we need another loop (simple heuristic: if report is short or has "gap")
-      if (this.state.currentLoop < this.state.maxLoops - 1 && this.needsAnotherLoop(report)) {
-        this.state.currentLoop++;
-        this.state.status = 'looping';
-        this.emit();
-        // Re-plan with gap awareness
-        plan.tasks = await this.replanWithGaps(topic, report);
-        continue;
-      }
-      break;
-    }
-
-    this.state.status = 'complete';
-    this.emit();
-    return this.state.finalReport || '';
-  }
-
-  private async plan(topic: string): Promise<SwarmPlan> {
-    const provider = this.getAvailableProvider();
-    const plannerPrompt = `Topic: "${topic}"
-    
-Decompose this into 5-7 parallel research tasks. Each task needs:
-- id: unique string (t1, t2...)
-- role: "researcher" | "analyst" | "writer"  
-- prompt: specific instruction for that agent
-- dependsOn: array of task ids this depends on (empty for parallel root tasks)
-
-Output ONLY a valid JSON array. Example:
-[{"id":"t1","role":"researcher","prompt":"Research X","dependsOn":[]},{"id":"t2","role":"analyst","prompt":"Synthesize t1","dependsOn":["t1"]}]`;
-
-    const response = await provider.runAgent('planner', plannerPrompt);
-    let tasks: SwarmTask[];
-    try {
-      tasks = JSON.parse(response);
-    } catch {
-      // Fallback plan
-      tasks = this.fallbackPlan(topic);
-    }
-    return { topic, tasks };
-  }
-
-  private fallbackPlan(topic: string): SwarmTask[] = [
-    { id: 't1', role: 'researcher', prompt: `Research current landscape of ${topic}: key players, funding, trends`, dependsOn: [] },
-    { id: 't2', role: 'researcher', prompt: `Analyze market dynamics and competitive landscape for ${topic}`, dependsOn: [] },
-    { id: 't3', role: 'researcher', prompt: `Identify regulatory, technical, or adoption challenges for ${topic}`, dependsOn: [] },
-    { id: 't4', role: 'analyst', prompt: `Synthesize findings from t1, t2, t3 into strategic insights for ${topic}`, dependsOn: ['t1', 't2', 't3'] },
-    { id: 't5', role: 'writer', prompt: `Write executive report from synthesized analysis on ${topic}`, dependsOn: ['t4'] },
-  ];
-
-  private async executeSwarm(plan: SwarmPlan): Promise<void> {
-    const completed = new Set<string>();
-    
-    while (completed.size < plan.tasks.length) {
-      const ready = plan.tasks.filter(t => 
-        !completed.has(t.id) && 
-        (t.dependsOn?.every(d => completed.has(d)) ?? true)
-      );
-      
-      if (ready.length === 0) break; // circular dep protection
-      
-      // Run ready tasks in parallel
-      await Promise.all(ready.map(task => this.runTask(task)));
-      ready.forEach(t => completed.add(t.id));
-      this.emit();
-    }
-  }
-
-  private async runTask(task: SwarmTask): Promise<void> {
-    const provider = this.getAvailableProvider();
-    
-    this.state.results.set(task.id, {
-      taskId: task.id,
-      role: task.role,
-      content: '',
-      status: 'working',
-      startedAt: Date.now(),
-    });
-    this.emit();
+  private async runTask(task: Task): Promise<void> {
+    task.status = 'working';
+    delete task.result;
+    delete task.error;
+    this.emit({ type: 'task_update', task: { ...task } });
 
     try {
-      const content = await provider.runAgent(task.role, task.prompt);
-      this.state.results.set(task.id, {
-        taskId: task.id,
-        role: task.role,
-        content,
-        status: 'done',
-        startedAt: this.state.results.get(task.id)?.startedAt || Date.now(),
-        completedAt: Date.now(),
-      });
+      const result = await this.provider.runAgent('agent', task.title);
+      task.status = 'done';
+      task.result = result;
     } catch (error) {
-      this.state.results.set(task.id, {
-        taskId: task.id,
-        role: task.role,
-        content: '',
-        status: 'failed',
-        error: error instanceof Error ? error.message : 'Unknown error',
-        startedAt: this.state.results.get(task.id)?.startedAt || Date.now(),
-        completedAt: Date.now(),
-      });
+      task.status = 'failed';
+      task.error = error instanceof Error ? error.message : 'Unknown error';
     }
-    this.emit();
+    this.emit({ type: 'task_update', task: { ...task } });
   }
 
-  private async synthesize(plan: SwarmPlan): Promise<string> {
-    const provider = this.getAvailableProvider();
-    const completedResults = Array.from(this.state.results.values())
-      .filter(r => r.status === 'done')
-      .map(r => `## ${r.role.toUpperCase()} (${r.taskId})\n${r.content}`)
-      .join('\n\n---\n\n');
+  /**
+   * Ask the LLM to merge completed task results into a Report and to identify
+   * remaining gaps. Emits gap_detected when gaps are found.
+   */
+  async synthesizer(tasks: Task[], loopNum: number): Promise<{ report: Report; gap?: Gap }> {
+    const body =
+      tasks
+        .filter((t) => t.status === 'done' && t.result)
+        .map((t) => `## ${t.title}\n${t.result}`)
+        .join('\n\n---\n\n') || 'No completed research results were provided.';
 
-    const prompt = `Previous research results:\n${completedResults}\n\nWrite a comprehensive executive report synthesizing all findings. Include: bottom line, key findings with data, strategic implications, outlook.`;
-    
-    return provider.runAgent('writer', prompt);
-  }
+    const prompt = `You are a report synthesizer. Merge the following research task results into a final report and identify any gaps that still need research.
 
-  private needsAnotherLoop(report: string): boolean {
-    return report.length < 2000 || report.toLowerCase().includes('gap') || report.toLowerCase().includes('missing');
-  }
-
-  private async replanWithGaps(topic: string, previousReport: string): Promise<SwarmTask[]> {
-    const provider = this.getAvailableProvider();
-    const prompt = `Previous report had gaps. Topic: "${topic}"
-Previous report:\n${previousReport}\n\nCreate 2-3 NEW research tasks to fill gaps. Output ONLY JSON array of tasks with id, role, prompt, dependsOn.`;
-    
-    const response = await provider.runAgent('planner', prompt);
-    try {
-      return JSON.parse(response);
-    } catch {
-      return [];
-    }
-  }
-
-  private getAvailableProvider(): LLMProvider {
-    const available = this.providers.find(p => p.isAvailable());
-    if (!available) throw new Error('No LLM provider available');
-    return available;
-  }
-
-  private emit(): void {
-    this.onUpdate(this.getState());
+Output exactly one JSON object in this shape (no prose, no markdown):
+{
+  "report": {
+    "summary": "string",
+    "sections": [ { "title": "string", "content": "string" } ]
+  },
+  "gap": {
+    "missing": [ "string" ],
+    "reasoning": "string"
   }
 }
+When the report is complete and no further research is needed, set "gap" to { "missing": [], "reasoning": "Complete" }.
 
-export function createEngine(config: ProviderConfig, onUpdate: (state: SwarmState) => void): SwarmEngine {
-  return new SwarmEngine(config, onUpdate);
+Research results:
+${body}`;
+
+    let report: Report = this.fallbackReport(tasks, loopNum);
+    let gap: Gap | undefined;
+
+    try {
+      const response = await this.provider.runAgent('synthesizer', prompt);
+      const json = extractJson(response);
+      if (json) {
+        const parsed = JSON.parse(json);
+        const reportRaw = parsed && typeof parsed === 'object' && parsed.report ? parsed.report : parsed;
+        report = this.normalizeReport(reportRaw, loopNum);
+        gap = this.normalizeGap(parsed?.gap);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown synthesis error';
+      this.emit({ type: 'error', message });
+    }
+
+    if (gap) {
+      this.emit({ type: 'gap_detected', gap, loopNumber: loopNum });
+    }
+    return { report, gap };
+  }
+
+  private fallbackReport(tasks: Task[], loopNum: number): Report {
+    const done = tasks.filter((t) => t.status === 'done' && t.result);
+    return {
+      summary:
+        done.map((t) => t.title).join(', ') || 'No completed research results were available.',
+      sections: done.map((t) => ({ title: t.title, content: t.result ?? '' })),
+      loopsUsed: loopNum,
+    };
+  }
+
+  private normalizeReport(value: unknown, loopNum: number): Report {
+    const obj = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+    const summary = typeof obj.summary === 'string' ? obj.summary : '';
+    const raw = Array.isArray(obj.sections) ? obj.sections : [];
+    const sections = raw
+      .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object')
+      .map((s) => ({
+        title: typeof s.title === 'string' ? s.title : 'Section',
+        content: typeof s.content === 'string' ? s.content : '',
+      }));
+    return { summary, sections, loopsUsed: loopNum };
+  }
+
+  private normalizeGap(value: unknown): Gap | undefined {
+    if (!value || typeof value !== 'object') return undefined;
+    const obj = value as Record<string, unknown>;
+    const missing = Array.isArray(obj.missing)
+      ? obj.missing.filter((m): m is string => typeof m === 'string')
+      : [];
+    if (missing.length === 0) return undefined;
+    return {
+      missing,
+      reasoning: typeof obj.reasoning === 'string' ? obj.reasoning : '',
+    };
+  }
+
+  /**
+   * Spawn fresh tasks for uncovered gap topics, emit a redispatch event, and
+   * run another swarm + synthesis pass.
+   */
+  async loop(topic: string, gap: Gap, loopNum: number): Promise<{ report: Report; gap?: Gap }> {
+    if (!gap || gap.missing.length === 0) {
+      throw new Error('No gaps to loop on');
+    }
+    if (loopNum >= this.maxLoops) {
+      throw new Error(`Max loops (${this.maxLoops}) reached`);
+    }
+
+    const newTasks: Task[] = gap.missing.map((m, i) => ({
+      id: `gap-${loopNum}-${i}`,
+      title: `Follow-up: ${m}`,
+      status: 'pending',
+    }));
+
+    this.emit({ type: 'redispatch', taskIds: newTasks.map((t) => t.id), loopNumber: loopNum });
+
+    await this.swarmRunner(newTasks);
+    const result = await this.synthesizer(newTasks, loopNum);
+    return result;
+  }
+
+  /**
+   * plan -> swarmRunner -> synth, then repeatedly loop while gaps remain and
+   * the loop budget allows. Emits a final_report once complete or exhausted.
+   */
+  async run(topic: string): Promise<Report> {
+    let plan = await this.plan(topic);
+
+    await this.swarmRunner(plan.tasks);
+    let result = await this.synthesizer(plan.tasks, 0);
+
+    let loopNum = 0;
+    // loop() only creates new tasks while loopNum < maxLoops, so stop the
+    // orchestration before loopNum reaches the budget.
+    while (result.gap && result.gap.missing.length > 0 && loopNum + 1 < this.maxLoops) {
+      loopNum++;
+      result = await this.loop(topic, result.gap, loopNum);
+    }
+
+    this.emit({ type: 'final_report', report: result.report });
+    return result.report;
+  }
 }

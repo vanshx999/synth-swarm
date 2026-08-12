@@ -1,33 +1,34 @@
-export interface SwarmTask {
+export interface Task {
   id: string;
-  role: string;
-  prompt: string;
-  dependsOn?: string[];
-}
-
-export interface SwarmPlan {
-  topic: string;
-  tasks: SwarmTask[];
-}
-
-export interface AgentResult {
-  taskId: string;
-  role: string;
-  content: string;
-  status: 'working' | 'done' | 'failed';
+  title: string;
+  status: 'pending' | 'working' | 'done' | 'failed';
+  result?: string;
   error?: string;
-  startedAt: number;
-  completedAt?: number;
 }
 
-export interface SwarmState {
-  plan: SwarmPlan | null;
-  results: Map<string, AgentResult>;
-  currentLoop: number;
-  maxLoops: number;
-  status: 'idle' | 'planning' | 'running' | 'synthesizing' | 'looping' | 'complete' | 'error';
-  finalReport?: string;
+export interface Plan {
+  tasks: Task[];
+  reasoning: string;
 }
+
+export interface Gap {
+  missing: string[];
+  reasoning: string;
+}
+
+export interface Report {
+  summary: string;
+  sections: { title: string; content: string }[];
+  loopsUsed: number;
+}
+
+export type SwarmEvent =
+  | { type: 'plan_ready'; plan: Plan }
+  | { type: 'task_update'; task: Task }
+  | { type: 'gap_detected'; gap: Gap; loopNumber: number }
+  | { type: 'redispatch'; taskIds: string[]; loopNumber: number }
+  | { type: 'final_report'; report: Report }
+  | { type: 'error'; message: string };
 
 export interface LLMProvider {
   name: string;
@@ -36,7 +37,8 @@ export interface LLMProvider {
 }
 
 export interface ProviderConfig {
-  gemini?: { apiKey: string };
-  groq?: { apiKey: string };
-  demoMode: boolean;
+  groqApiKey?: string;
+  provider: 'demo' | 'groq';
 }
+
+export type SwarmEventCallback = (event: SwarmEvent) => void;
