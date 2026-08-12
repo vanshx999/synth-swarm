@@ -10,16 +10,10 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        canvas: '#f6f7fb',
-        surface: '#ffffff',
-        ink: '#0b0f19',
-        muted: '#64748b',
-        dark: {
-          canvas: '#0b0f19',
-          surface: '#111827',
-          ink: '#e5e7eb',
-          muted: '#94a3b8',
-        },
+        canvas: 'var(--canvas)',
+        surface: 'var(--surface)',
+        ink: 'var(--ink)',
+        muted: 'var(--muted)',
         brand: {
           cyan: '#0ea5e9',
           violet: '#8b5cf6',

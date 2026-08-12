@@ -239,12 +239,8 @@ export function ChatView({
                   </span>
                   <span className="text-xs font-medium text-muted">Synth</span>
                 </div>
-                <div className="tilt-scene">
-                  <div className="tilt-card glass rounded-2xl border border-black/5 dark:border-white/10 p-5">
-                    <div className="tilt-card-inner">
-                      <ReportBody run={m.run} />
-                    </div>
-                  </div>
+                <div className="glass rounded-2xl border border-black/5 dark:border-white/10 p-5">
+                  <ReportBody run={m.run} />
                 </div>
               </div>
             </div>
