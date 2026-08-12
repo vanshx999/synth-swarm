@@ -1,5 +1,5 @@
-import { SwarmDashboard } from '@/components/SwarmDashboard';
+import { redirect } from 'next/navigation';
 
 export default function Home() {
-  return <SwarmDashboard />;
+  redirect('/dashboard');
 }

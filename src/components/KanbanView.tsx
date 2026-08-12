@@ -1,0 +1,155 @@
+'use client';
+
+import type { RunModel } from '@/lib/runModel';
+
+interface KanbanViewProps {
+  run: RunModel | null;
+}
+
+const COLUMNS = [
+  { key: 'pending', label: 'Queued', accent: 'text-slate-500', dot: 'bg-slate-400', ring: 'border-slate-300' },
+  { key: 'working', label: 'In Progress', accent: 'text-cyan-600', dot: 'bg-cyan-500', ring: 'border-cyan-400' },
+  { key: 'done', label: 'Complete', accent: 'text-emerald-600', dot: 'bg-emerald-500', ring: 'border-emerald-400' },
+  { key: 'failed', label: 'Failed', accent: 'text-rose-600', dot: 'bg-rose-500', ring: 'border-rose-400' },
+] as const;
+
+type StatusKey = (typeof COLUMNS)[number]['key'];
+
+const CARD_STYLES: Record<
+  StatusKey,
+  { border: string; head: string; badge: string }
+> = {
+  pending: { border: 'border-slate-200', head: 'text-slate-600', badge: 'bg-slate-100 text-slate-600' },
+  working: {
+    border: 'border-cyan-300',
+    head: 'text-cyan-700',
+    badge: 'bg-cyan-100 text-cyan-700',
+  },
+  done: {
+    border: 'border-emerald-300',
+    head: 'text-emerald-700',
+    badge: 'bg-emerald-100 text-emerald-700',
+  },
+  failed: {
+    border: 'border-rose-300',
+    head: 'text-rose-700',
+    badge: 'bg-rose-100 text-rose-700',
+  },
+};
+
+export function KanbanView({ run }: KanbanViewProps) {
+  if (!run) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
+        <div className="text-5xl mb-4">🗂</div>
+        <h3 className="text-lg font-semibold">No swarm to display yet</h3>
+        <p className="text-sm text-slate-500 mt-1 max-w-sm">
+          Run a research swarm from the chat view — its agents will appear here
+          on the board in real time.
+        </p>
+      </div>
+    );
+  }
+
+  const tasks = run.tasks;
+  const columns = COLUMNS.map((col) => ({
+    ...col,
+    items: tasks.filter((t) => t.status === col.key),
+  }));
+  const total = tasks.length || 1;
+
+  return (
+    <div className="flex-1 flex flex-col p-4 lg:p-6 overflow-hidden">
+      {/* Board header */}
+      <div className="flex items-center justify-between mb-4 px-1">
+        <div>
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-cyan-500 to-fuchsia-500" />
+            Swarm Kanban
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5 truncate">
+            {run.topic || 'research swarm'}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {columns.map((c) => (
+            <div key={c.key} className="flex items-center gap-1 font-mono text-[10px] text-slate-500 bg-white/70 rounded-full px-2.5 py-1 border border-black/5">
+              <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+              {c.label} <span className="font-bold text-slate-700">{c.items.length}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="mb-4 h-2 rounded-full bg-black/5 overflow-hidden flex">
+        {columns
+          .filter((c) => c.items.length > 0)
+          .map((c, i) => (
+            <div
+              key={i}
+              className={c.dot}
+              style={{ width: `${(c.items.length / total) * 100}%` }}
+            />
+          ))}
+      </div>
+
+      {/* Columns */}
+      <div className="flex-1 grid grid-cols-2 xl:grid-cols-4 gap-3 min-h-0">
+        {columns.map((col) => (
+          <div
+            key={col.key}
+            className={`rounded-2xl border ${col.ring} bg-white/60 backdrop-blur p-3 flex flex-col min-h-0 ${
+              col.key === 'working' ? 'ring-2 ring-cyan-500/10' : ''
+            }`}
+          >
+            <div className={`flex items-center gap-2 px-1 pb-2 font-mono text-[10px] uppercase tracking-[0.2em] ${col.accent}`}>
+              <span className={`w-2 h-2 rounded-full ${col.dot} ${col.key === 'working' ? 'animate-pulse' : ''}`} />
+              {col.label}
+              <span className="ml-auto text-slate-400">{col.items.length}</span>
+            </div>
+
+            <div className="custom-scroll flex-1 overflow-y-auto space-y-2 pr-0.5 min-h-0">
+              {col.items.map((t, i) => {
+                const style = CARD_STYLES[col.key];
+                return (
+                  <div
+                    key={t.id}
+                    className={`rounded-xl border ${style.border} bg-white p-3 transition-all duration-300 hover:shadow-[0_4px_16px_rgba(139,92,246,0.12),0_0_0_1px_rgba(139,92,246,0.35)] hover:-translate-y-0.5 ${
+                      col.key === 'working' ? 'animate-think' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`font-mono text-[9px] uppercase tracking-wider ${style.head}`}>
+                        A{String(i + 1).padStart(2, '0')}
+                      </span>
+                      <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full ${style.badge}`}>
+                        {t.status}
+                      </span>
+                    </div>
+                    <div className={`mt-1.5 text-[13px] leading-snug font-medium ${style.head}`}>
+                      {t.title}
+                    </div>
+                    {t.status === 'working' && t.thinking && (
+                      <div className="mt-1.5 font-mono text-[10px] text-cyan-600 animate-think">{t.thinking}</div>
+                    )}
+                    {(t.status === 'done' && t.result) || (t.status === 'failed' && t.error) ? (
+                      <div className="mt-1.5 text-[11px] leading-snug text-slate-500 line-clamp-3 whitespace-pre-wrap">
+                        {t.status === 'failed' ? t.error : t.result}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+              {col.items.length === 0 && (
+                <div className="h-20 rounded-xl border border-dashed border-black/10 flex items-center justify-center text-[11px] text-slate-400">
+                  empty
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

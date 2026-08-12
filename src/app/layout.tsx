@@ -13,8 +13,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'SYNTH — Swarm Deep Research',
-  description: 'Mission-control for parallel agent swarms. Research anything with a fleet of AI agents.',
+  title: 'Synth — Swarm Deep Research',
+  description:
+    'Mission-control for parallel agent swarms. Research anything with a fleet of AI agents.',
 };
 
 export default function RootLayout({
@@ -25,16 +26,14 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <body
-        className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} font-tech bg-void text-gray-100 antialiased min-h-screen`}
+        className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} font-tech bg-canvas text-ink antialiased min-h-screen`}
       >
-        {/* Animated backdrop */}
         <div className="aurora-layer">
           <div className="aurora-blob aurora-blob-1" />
           <div className="aurora-blob aurora-blob-2" />
           <div className="aurora-blob aurora-blob-3" />
         </div>
-        <div className="grid-overlay" />
-        <div className="scanline" />
+        <div className="dots-overlay" />
 
         {children}
       </body>
