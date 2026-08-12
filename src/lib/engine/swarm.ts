@@ -151,7 +151,9 @@ Each task id must be unique. "reasoning" should briefly explain how the tasks co
     this.emit({ type: 'task_update', task: { ...task } });
 
     try {
-      const result = await this.provider.runAgent('agent', task.title);
+      const result = await this.provider.runAgent('agent', task.title, (status) => {
+        this.emit({ type: 'agent_thinking', taskId: task.id, status, timestamp: Date.now() });
+      });
       task.status = 'done';
       task.result = result;
     } catch (error) {
@@ -172,7 +174,7 @@ Each task id must be unique. "reasoning" should briefly explain how the tasks co
         .map((t) => `## ${t.title}\n${t.result}`)
         .join('\n\n---\n\n') || 'No completed research results were provided.';
 
-    const prompt = `You are a report synthesizer. Merge the following research task results into a final report and identify any gaps that still need research.
+    const prompt = `You are a report synthesizer. Merge the following research task results into a final report and identify any gaps that still need research. Identify what SPECIFIC aspects of the topic are NOT covered. Do NOT suggest generic categories — only name gaps specific to THIS topic.
 
 Output exactly one JSON object in this shape (no prose, no markdown):
 {
@@ -279,20 +281,34 @@ ${body}`;
    * the loop budget allows. Emits a final_report once complete or exhausted.
    */
   async run(topic: string): Promise<Report> {
-    let plan = await this.plan(topic);
+    const plan = await this.plan(topic);
+    const allTasks: Task[] = [...plan.tasks];
 
     await this.swarmRunner(plan.tasks);
-    let result = await this.synthesizer(plan.tasks, 0);
+    let result = await this.synthesizer(allTasks, 0);
 
     let loopNum = 0;
-    // loop() only creates new tasks while loopNum < maxLoops, so stop the
-    // orchestration before loopNum reaches the budget.
     while (result.gap && result.gap.missing.length > 0 && loopNum + 1 < this.maxLoops) {
       loopNum++;
-      result = await this.loop(topic, result.gap, loopNum);
+      // Create gap tasks and run swarm on them
+      const gapTasks: Task[] = result.gap.missing.map((m, i) => ({
+        id: `gap-${loopNum}-${i}`,
+        title: `Follow-up: ${m}`,
+        status: 'pending' as const,
+      }));
+      this.emit({ type: 'redispatch', taskIds: gapTasks.map((t) => t.id), loopNumber: loopNum });
+      await this.swarmRunner(gapTasks);
+
+      // Accumulate all tasks and re-synthesize
+      allTasks.push(...gapTasks);
+      result = await this.synthesizer(allTasks, loopNum);
     }
 
-    this.emit({ type: 'final_report', report: result.report });
-    return result.report;
+    const report: Report = {
+      ...result.report,
+      loopsUsed: loopNum,
+    };
+    this.emit({ type: 'final_report', report });
+    return report;
   }
 }
