@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 229, 231, 235;
+  --background-start-rgb: 10, 10, 15;
+  --background-end-rgb: 10, 10, 15;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+    to bottom,
+    rgb(var(--background-start-rgb)),
+    rgb(var(--background-end-rgb))
+  );
+  min-height: 100vh;
+}
+
+/* ------------------------------------------------------------------------- *
+ * Mission-control UI: terminal scrollbar + status animations
+ * ------------------------------------------------------------------------- */
+
+.terminal-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.terminal-scroll::-webkit-scrollbar-track {
+  background: #0a0f0a;
+}
+.terminal-scroll::-webkit-scrollbar-thumb {
+  background: #1f3d2b;
+  border-radius: 4px;
+}
+.terminal-scroll::-webkit-scrollbar-thumb:hover {
+  background: #2f5b40;
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(251, 191, 36, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.6); }
+}
+.animate-glow { animation: glow-pulse 2s ease-in-out infinite; }
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.7); }
+}
+.animate-dot { animation: dot-pulse 1.4s ease-in-out infinite; }
+
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.animate-blink { animation: blink 1s step-end infinite; }
+
+@keyframes think-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+.animate-think { animation: think-pulse 0.9s ease-in-out infinite; }
