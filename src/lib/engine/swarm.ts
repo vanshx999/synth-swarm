@@ -1,5 +1,5 @@
 import { SwarmPlan, SwarmTask, AgentResult, SwarmState, LLMProvider } from '../types';
-import { createProviders, ProviderConfig } from './providers';
+import { createProviders, ProviderConfig } from '../providers';
 
 export class SwarmEngine {
   private providers: LLMProvider[];
@@ -87,13 +87,15 @@ Output ONLY a valid JSON array. Example:
     return { topic, tasks };
   }
 
-  private fallbackPlan(topic: string): SwarmTask[] = [
+  private fallbackPlan(topic: string): SwarmTask[] {
+    return [
     { id: 't1', role: 'researcher', prompt: `Research current landscape of ${topic}: key players, funding, trends`, dependsOn: [] },
     { id: 't2', role: 'researcher', prompt: `Analyze market dynamics and competitive landscape for ${topic}`, dependsOn: [] },
     { id: 't3', role: 'researcher', prompt: `Identify regulatory, technical, or adoption challenges for ${topic}`, dependsOn: [] },
     { id: 't4', role: 'analyst', prompt: `Synthesize findings from t1, t2, t3 into strategic insights for ${topic}`, dependsOn: ['t1', 't2', 't3'] },
     { id: 't5', role: 'writer', prompt: `Write executive report from synthesized analysis on ${topic}`, dependsOn: ['t4'] },
   ];
+  }
 
   private async executeSwarm(plan: SwarmPlan): Promise<void> {
     const completed = new Set<string>();

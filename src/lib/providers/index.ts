@@ -1,4 +1,5 @@
-import { LLMProvider, ProviderConfig } from './types';
+import { LLMProvider, ProviderConfig } from '../types';
+export type { ProviderConfig } from '../types';
 
 const DEMO_RESPONSES: Record<string, string> = {
   planner: `[
@@ -92,7 +93,7 @@ export class GroqProvider implements LLMProvider {
     return data.choices[0]?.message?.content || '';
   }
 
-  private getSystemPrompt(role: string): string {
+  getSystemPrompt(role: string): string {
     const prompts: Record<string, string> = {
       planner: 'You are a research planner. Decompose the user topic into 5-7 parallel research tasks. Each task needs a unique id, role (researcher/analyst/writer), prompt, and optional dependsOn array. Output ONLY valid JSON array.',
       researcher: 'You are a deep researcher. Provide specific, factual, well-structured findings with data points, names, numbers. No fluff.',
