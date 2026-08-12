@@ -53,11 +53,25 @@ export class DemoProvider implements LLMProvider {
     const isPlanner = role.includes('plan');
     const isSynthesizer = role === 'synthesizer' || role === 'writer';
 
-    // Extract clean search query — for planner, extract the topic from the prompt
-    let searchQuery = task;
+    // For synthesizer, the task IS the full synthesis prompt with all research results
+    // Do NOT search Tavily - use the provided research directly
+    if (isSynthesizer) {
+      onThinking?.('synthesizing...');
+      const ms = 1500 + Math.random() * 1000;
+      await new Promise<void>((r) => setTimeout(r, ms));
+      onThinking?.('drafting report...');
+      return this.synthesize(task); // task = full synthesis prompt with all research
+    }
+
+    // For planner and researcher: do Tavily search
+    // Clean the search query — strip parenthetical hints, "Follow-up:" prefix
+    let searchQuery = task
+      .replace(/\s*\(.*?\)\s*/g, ' ')  // remove (use search results...) / (synthesize...)
+      .replace(/^Follow-up:\s*/i, '')  // remove "Follow-up: " prefix for gap tasks
+      .trim();
     if (isPlanner) {
       const topicMatch = task.match(/"([^"]+)"/);
-      searchQuery = topicMatch ? topicMatch[1] : task;
+      if (topicMatch) searchQuery = topicMatch[1];
     }
 
     onThinking?.('searching...');
@@ -71,10 +85,6 @@ export class DemoProvider implements LLMProvider {
 
     if (isPlanner) {
       return this.planFromSearch(task, sources);
-    }
-
-    if (isSynthesizer) {
-      return this.synthesize(task, sources);
     }
 
     if (sources.length > 0) {
@@ -118,23 +128,69 @@ export class DemoProvider implements LLMProvider {
     return JSON.stringify(plan);
   }
 
-  private synthesize(prompt: string, sources: Source[]): string {
-    const hasSources = sources.length > 0;
-    const ctx = hasSources ? sourcesToContext(sources) : 'No search results available.';
+  private synthesize(prompt: string): string {
+    // The prompt contains all the research results from all tasks
+    // Parse the task results from the prompt and create a structured report
+    const taskResults = this.extractTaskResults(prompt);
+    
+    if (taskResults.length === 0) {
+      return JSON.stringify({
+        summary: 'No research results available to synthesize.',
+        sections: [],
+        gaps: {
+          missing: ['All research areas'],
+          reasoning: 'No completed task results were provided for synthesis.',
+        },
+      });
+    }
+
+    const sections = taskResults.map((tr) => ({
+      title: tr.title,
+      content: tr.result,
+    }));
+
+    // Detect potential gaps from the task titles
+    const coveredTopics = taskResults.map((tr) => tr.title.toLowerCase());
+    const commonGaps = [
+      'implementation details',
+      'cost analysis',
+      'security considerations',
+      'scalability patterns',
+      'real-world case studies',
+    ];
+    const missing = commonGaps.filter(
+      (gap) => !coveredTopics.some((ct) => ct.includes(gap))
+    ).slice(0, 3);
 
     return JSON.stringify({
-      summary: hasSources
-        ? `Synthesis based on ${sources.length} search results across key dimensions.`
-        : 'Synthesis based on available research findings.',
-      sections: sources.map((s) => ({
-        title: s.title,
-        content: `${s.snippet}\n\nSource: ${s.url}`,
-      })),
+      summary: `Comprehensive synthesis of ${taskResults.length} research areas covering ${taskResults.map((t) => t.title.split(' ').slice(0, 3).join(' ')).join(', ')}.`,
+      sections,
       gaps: {
-        missing: [],
-        reasoning: 'Coverage assessed against available search results.',
+        missing,
+        reasoning: missing.length > 0
+          ? `Potential areas for deeper exploration: ${missing.join(', ')}.`
+          : 'Coverage appears comprehensive across all research angles.',
       },
     });
+  }
+
+  private extractTaskResults(prompt: string): { title: string; result: string }[] {
+    const results: { title: string; result: string }[] = [];
+    const sections = prompt.split('\n\n---\n\n');
+    
+    for (const section of sections) {
+      const titleMatch = section.match(/^##\s+(.+)$/m);
+      const contentMatch = section.match(/^##\s+.+?\n([\s\S]+)/);
+      
+      if (titleMatch && contentMatch) {
+        results.push({
+          title: titleMatch[1].trim(),
+          result: contentMatch[1].trim(),
+        });
+      }
+    }
+    
+    return results;
   }
 }
 
@@ -161,9 +217,54 @@ export class GroqProvider implements LLMProvider {
       throw new Error('Groq API key not configured');
     }
 
-    // Extract clean search query — for planner, extract the topic from the prompt
-    let searchQuery = task;
     const isPlanner = role.includes('plan');
+    const isSynthesizer = role === 'synthesizer' || role === 'writer';
+
+    // For synthesizer, the task IS the full synthesis prompt with all research results
+    // Do NOT search Tavily - use the provided research directly
+    if (isSynthesizer) {
+      onThinking?.('synthesizing...');
+
+      const systemPrompt =
+        `${this.getSystemPrompt(role)}\n\nSynthesize the following research into a comprehensive report. Output ONLY valid JSON with "summary", "sections" array [{title, content}], and "gaps": {"missing": string[], "reasoning": string}.`;
+
+      onThinking?.('drafting report...');
+
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: task }, // task = full synthesis prompt with all research
+          ],
+          temperature: 0.3,
+          max_tokens: 4096,
+        }),
+      });
+
+      if (!response.ok) {
+        const detail = response.statusText ? ` (${response.statusText})` : '';
+        throw new Error(`Groq API error: received status ${response.status}${detail}`);
+      }
+
+      const data = await response.json();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') {
+        throw new Error('Groq API returned an unexpected response shape');
+      }
+      return content;
+    }
+
+    // For planner and researcher: do Tavily search
+    let searchQuery = task
+      .replace(/\s*\(.*?\)\s*/g, ' ')
+      .replace(/^Follow-up:\s*/i, '')
+      .trim();
     if (isPlanner) {
       const topicMatch = task.match(/"([^"]+)"/);
       searchQuery = topicMatch ? topicMatch[1] : task;
