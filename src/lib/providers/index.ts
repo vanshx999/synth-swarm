@@ -8,11 +8,11 @@ const DEMO_RESPONSES: Record<string, string> = {
   planner: `{
   "reasoning": "I decomposed this into: (1) current startup landscape, (2) government policy analysis, (3) talent and education pipeline, (4) key challenges and barriers, (5) future outlook — this covers both the structural drivers and the friction points that judges look for in a comprehensive analysis.",
   "tasks": [
-    {"id": "t1", "role": "researcher", "prompt": "Map the current Indian AI startup landscape: leading companies, venture funding totals, notable rounds, and dominant sectors in 2026.", "dependsOn": []},
-    {"id": "t2", "role": "researcher", "prompt": "Analyze India's AI government policy and regulatory environment: DPDP Act enforcement, MeitY guidelines, and the national AI mission.", "dependsOn": []},
-    {"id": "t3", "role": "researcher", "prompt": "Investigate India's AI talent and education pipeline: annual graduates, hiring demand, salary bands, skill gaps, and brain drain dynamics.", "dependsOn": []},
-    {"id": "t4", "role": "analyst", "prompt": "Synthesize findings from t1, t2, and t3 into strategic insights, highlighting key challenges, barriers, and cross-cutting patterns.", "dependsOn": ["t1", "t2", "t3"]},
-    {"id": "t5", "role": "writer", "prompt": "Write the final executive report covering startup landscape, policy, talent, challenges, and future outlook.", "dependsOn": ["t4"]}
+    {"id": "t1", "title": "Map the current Indian AI startup landscape: leading companies, venture funding totals, notable rounds, and dominant sectors in 2026.", "status": "pending"},
+    {"id": "t2", "title": "Analyze India's AI government policy and regulatory environment: DPDP Act enforcement, MeitY guidelines, and the national AI mission.", "status": "pending"},
+    {"id": "t3", "title": "Investigate India's AI talent and education pipeline: annual graduates, hiring demand, salary bands, skill gaps, and brain drain dynamics.", "status": "pending"},
+    {"id": "t4", "title": "Synthesize findings on startup landscape, policy, and talent into strategic insights, highlighting key challenges, barriers, and cross-cutting patterns.", "status": "pending"},
+    {"id": "t5", "title": "Write the final executive report covering startup landscape, policy, talent, challenges, and future outlook.", "status": "pending"}
   ]
 }`,
 
