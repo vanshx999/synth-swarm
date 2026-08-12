@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { SwarmEngine } from '@/lib/engine/swarm';
 import { getProvider } from '@/lib/providers/index';
-import type { SwarmEvent, SwarmEventCallback } from '@/lib/types';
+import type { ProviderConfig, SwarmEvent, SwarmEventCallback } from '@/lib/types';
 
 const KEEPALIVE_INTERVAL_MS = 15_000;
 
@@ -26,6 +26,11 @@ export async function POST(request: NextRequest) {
     body.provider === 'groq' ? 'groq' : body.provider === 'demo' ? 'demo' : 'demo';
   const groqApiKey = process.env.GROQ_API_KEY;
 
+  const config: ProviderConfig = {
+    provider: providerChoice,
+    groqApiKey: groqApiKey ?? undefined,
+  };
+
   const encoder = new TextEncoder();
   let keepAlive: ReturnType<typeof setInterval> | null = null;
 
@@ -45,7 +50,7 @@ export async function POST(request: NextRequest) {
       }, KEEPALIVE_INTERVAL_MS);
 
       try {
-        const provider = getProvider(providerChoice, groqApiKey);
+        const provider = getProvider(config);
 
         const engine = new SwarmEngine(provider, ((event: SwarmEvent) => {
           send(event);
