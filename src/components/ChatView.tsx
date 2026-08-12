@@ -92,6 +92,7 @@ export function ChatView({
     const updated = appendLog(run, evt);
     eventsRef.current.push(evt);
     setCurrentRun((prev) => (prev ? { ...prev, ...updated } : updated));
+    onActiveRunChange(updated);
     return updated;
   };
 
@@ -357,11 +358,11 @@ function LiveSwarmPanel({ run }: { run: RunModel }) {
 
 function MiniReport({ task, index }: { task: RunModel['tasks'][number]; index: number }) {
   const palettes = [
-    { bg: 'bg-cyan-50', border: 'border-cyan-200', text: 'text-cyan-700', step: 'bg-cyan-500' },
-    { bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', step: 'bg-violet-500' },
-    { bg: 'bg-fuchsia-50', border: 'border-fuchsia-200', text: 'text-fuchsia-700', step: 'bg-fuchsia-500' },
-    { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', step: 'bg-emerald-500' },
-    { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', step: 'bg-amber-500' },
+    { bg: 'bg-cyan-50 dark:bg-cyan-950/40', border: 'border-cyan-200 dark:border-cyan-800', text: 'text-cyan-700 dark:text-cyan-300', step: 'bg-cyan-500' },
+    { bg: 'bg-violet-50 dark:bg-violet-950/40', border: 'border-violet-200 dark:border-violet-800', text: 'text-violet-700 dark:text-violet-300', step: 'bg-violet-500' },
+    { bg: 'bg-fuchsia-50 dark:bg-fuchsia-950/40', border: 'border-fuchsia-200 dark:border-fuchsia-800', text: 'text-fuchsia-700 dark:text-fuchsia-300', step: 'bg-fuchsia-500' },
+    { bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-800', text: 'text-emerald-700 dark:text-emerald-300', step: 'bg-emerald-500' },
+    { bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-800', text: 'text-amber-700 dark:text-amber-300', step: 'bg-amber-500' },
   ];
   const p = palettes[index % palettes.length];
   const status =
@@ -390,6 +391,11 @@ function MiniReport({ task, index }: { task: RunModel['tasks'][number]; index: n
         </span>
       </div>
       <div className={`mt-1.5 text-[11px] leading-snug line-clamp-3 ${p.text}`}>{task.title}</div>
+      {task.status === 'working' && task.thinking && (
+        <div className="mt-1 font-mono text-[10px] text-cyan-600 dark:text-cyan-400 animate-think">
+          {task.thinking}
+        </div>
+      )}
     </div>
   );
 }

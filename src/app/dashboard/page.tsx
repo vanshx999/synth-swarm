@@ -8,9 +8,10 @@ import type { RunModel } from '@/lib/runModel';
 import { applyEvent, emptyRun } from '@/lib/runModel';
 import { ChatView } from '@/components/ChatView';
 import { KanbanView } from '@/components/KanbanView';
+import { ResourcesView } from '@/components/ResourcesView';
 import ThemeToggle from '@/components/ThemeToggle';
 
-type ViewMode = 'chat' | 'kanban';
+type ViewMode = 'chat' | 'kanban' | 'resources';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -230,7 +231,7 @@ export default function DashboardPage() {
             </svg>
           </button>
 
-          {/* Mode toggle: Chat | Kanban */}
+          {/* Mode toggle: Chat | Kanban | Resources */}
           <div className="flex items-center gap-1 rounded-full bg-black/5 dark:bg-white/10 p-1">
             <button
               onClick={() => setMode('chat')}
@@ -251,6 +252,16 @@ export default function DashboardPage() {
               }`}
             >
               🗂 Kanban
+            </button>
+            <button
+              onClick={() => setMode('resources')}
+              className={`font-mono text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full transition-all ${
+                mode === 'resources'
+                  ? 'bg-surface text-ink shadow-soft'
+                  : 'text-muted hover:text-ink'
+              }`}
+            >
+              🔗 Resources
             </button>
           </div>
 
@@ -286,8 +297,10 @@ export default function DashboardPage() {
               onSaveRun={handleSaveRun}
               onActiveRunChange={handleActiveRunChange}
             />
-          ) : (
+          ) : mode === 'kanban' ? (
             <KanbanView run={activeRun} />
+          ) : (
+            <ResourcesView run={activeRun} />
           )}
         </div>
       </main>

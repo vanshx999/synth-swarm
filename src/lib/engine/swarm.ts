@@ -151,9 +151,16 @@ Each task id must be unique. "reasoning" should briefly explain how the tasks co
     this.emit({ type: 'task_update', task: { ...task } });
 
     try {
-      const result = await this.provider.runAgent('agent', task.title, (status) => {
-        this.emit({ type: 'agent_thinking', taskId: task.id, status, timestamp: Date.now() });
-      });
+      const result = await this.provider.runAgent(
+        'agent',
+        task.title,
+        (status) => {
+          this.emit({ type: 'agent_thinking', taskId: task.id, status, timestamp: Date.now() });
+        },
+        (sources) => {
+          task.sources = sources;
+        }
+      );
       task.status = 'done';
       task.result = result;
     } catch (error) {

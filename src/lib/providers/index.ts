@@ -49,7 +49,12 @@ export class DemoProvider implements LLMProvider {
     return true;
   }
 
-  async runAgent(role: string, task: string, onThinking?: (s: string) => void): Promise<string> {
+  async runAgent(
+    role: string,
+    task: string,
+    onThinking?: (s: string) => void,
+    onSources?: (sources: Source[]) => void
+  ): Promise<string> {
     const isPlanner = role.includes('plan');
     const isSynthesizer = role === 'synthesizer' || role === 'writer';
 
@@ -77,6 +82,7 @@ export class DemoProvider implements LLMProvider {
     onThinking?.('searching...');
 
     const sources = await searchTavily(searchQuery);
+    onSources?.(sources);
 
     onThinking?.(`found ${sources.length} results`);
 
@@ -132,7 +138,7 @@ export class DemoProvider implements LLMProvider {
     // The prompt contains all the research results from all tasks
     // Parse the task results from the prompt and create a structured report
     const taskResults = this.extractTaskResults(prompt);
-    
+
     if (taskResults.length === 0) {
       return JSON.stringify({
         summary: 'No research results available to synthesize.',
@@ -144,13 +150,18 @@ export class DemoProvider implements LLMProvider {
       });
     }
 
-    const sections = taskResults.map((tr) => ({
-      title: tr.title,
-      content: tr.result,
+    // Condensed executive answer — not a per-task dump.
+    // Keep 3-5 short thematic sections, each trimmed to a couple sentences.
+    const topics = taskResults.map((tr) => this.cleanTitle(tr.title));
+    const directAnswer = this.directAnswer(taskResults);
+
+    const sections = taskResults.slice(0, 4).map((tr) => ({
+      title: this.cleanTitle(tr.title),
+      content: this.condense(tr.result),
     }));
 
     // Detect potential gaps from the task titles
-    const coveredTopics = taskResults.map((tr) => tr.title.toLowerCase());
+    const coveredTopics = topics.join(' ').toLowerCase();
     const commonGaps = [
       'implementation details',
       'cost analysis',
@@ -158,12 +169,12 @@ export class DemoProvider implements LLMProvider {
       'scalability patterns',
       'real-world case studies',
     ];
-    const missing = commonGaps.filter(
-      (gap) => !coveredTopics.some((ct) => ct.includes(gap))
-    ).slice(0, 3);
+    const missing = commonGaps
+      .filter((gap) => !coveredTopics.includes(gap))
+      .slice(0, 3);
 
     return JSON.stringify({
-      summary: `Comprehensive synthesis of ${taskResults.length} research areas covering ${taskResults.map((t) => t.title.split(' ').slice(0, 3).join(' ')).join(', ')}.`,
+      summary: directAnswer,
       sections,
       gaps: {
         missing,
@@ -172,6 +183,36 @@ export class DemoProvider implements LLMProvider {
           : 'Coverage appears comprehensive across all research angles.',
       },
     });
+  }
+
+  /** A 1-2 sentence direct answer drawn from the first findings. */
+  private directAnswer(results: { title: string; result: string }[]): string {
+    const first = results[0]?.result || '';
+    const lines = first
+      .replace(/^#{1,6}\s*/gm, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .split(/\n+/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 20);
+    const lead = (lines[0] || 'Findings synthesized from the swarm.').slice(0, 220);
+    return `${lead}${lead.endsWith('.') ? '' : '.'} (Condensed from ${results.length} research areas.)`;
+  }
+
+  private cleanTitle(title: string): string {
+    return title
+      .replace(/^Follow-up:\s*/i, '')
+      .replace(/\s*\(use search results.*?\)\s*/gi, '')
+      .replace(/\s*\(synthesize.*?\)\s*/gi, '')
+      .trim();
+  }
+
+  private condense(content: string): string {
+    const text = content
+      .replace(/^#{1,6}\s*/gm, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return text.slice(0, 220);
   }
 
   private extractTaskResults(prompt: string): { title: string; result: string }[] {
@@ -212,7 +253,12 @@ export class GroqProvider implements LLMProvider {
     return this.apiKey.length > 0;
   }
 
-  async runAgent(role: string, task: string, onThinking?: (s: string) => void): Promise<string> {
+  async runAgent(
+    role: string,
+    task: string,
+    onThinking?: (s: string) => void,
+    onSources?: (sources: Source[]) => void
+  ): Promise<string> {
     if (!this.isAvailable()) {
       throw new Error('Groq API key not configured');
     }
@@ -226,7 +272,7 @@ export class GroqProvider implements LLMProvider {
       onThinking?.('synthesizing...');
 
       const systemPrompt =
-        `${this.getSystemPrompt(role)}\n\nSynthesize the following research into a comprehensive report. Output ONLY valid JSON with "summary", "sections" array [{title, content}], and "gaps": {"missing": string[], "reasoning": string}.`;
+        `${this.getSystemPrompt(role)}\n\nWrite a tight executive answer under 400 words total. Do NOT list or repeat raw findings — synthesize them. Structure: (1) a 2-3 sentence direct answer to the topic up top, then (2) 3-5 short thematic sections (merge overlapping findings, do NOT write one section per research task), each 2-4 sentences MAX, in your own words. Cut anything not essential to directly answering the topic. Output ONLY valid JSON with "summary" (the 2-3 sentence direct answer), "sections" array [{title, content}], and "gaps": {"missing": string[], "reasoning": string}.`;
 
       onThinking?.('drafting report...');
 
@@ -243,7 +289,7 @@ export class GroqProvider implements LLMProvider {
             { role: 'user', content: task }, // task = full synthesis prompt with all research
           ],
           temperature: 0.3,
-          max_tokens: 4096,
+          max_tokens: 900,
         }),
       });
 
@@ -273,6 +319,7 @@ export class GroqProvider implements LLMProvider {
     onThinking?.('searching...');
 
     const sources = await searchTavily(searchQuery);
+    onSources?.(sources);
 
     onThinking?.(`found ${sources.length} results`);
 

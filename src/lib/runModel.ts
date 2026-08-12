@@ -48,6 +48,15 @@ export function applyEvent(run: RunModel, evt: SwarmEvent, at: number): RunModel
       break;
     }
 
+    case 'agent_thinking': {
+      const idx = next.tasks.findIndex((t) => t.id === evt.taskId);
+      if (idx >= 0) {
+        next.tasks = [...next.tasks];
+        next.tasks[idx] = { ...next.tasks[idx], thinking: evt.status };
+      }
+      break;
+    }
+
     case 'gap_detected':
       next.gaps = [
         ...next.gaps,

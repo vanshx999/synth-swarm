@@ -41,7 +41,12 @@ export type SwarmEvent =
 
 export interface LLMProvider {
   name: string;
-  runAgent(role: string, task: string, onThinking?: (status: string) => void): Promise<string>;
+  runAgent(
+    role: string,
+    task: string,
+    onThinking?: (status: string) => void,
+    onSources?: (sources: Source[]) => void
+  ): Promise<string>;
   isAvailable(): boolean;
 }
 
