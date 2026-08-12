@@ -225,7 +225,7 @@ export function ChatView({
         {messages.map((m) =>
           m.role === 'user' ? (
             <div key={m.id} className="flex justify-end">
-              <div className="max-w-[78%] rounded-2xl rounded-br-sm bg-gradient-to-r from-cyan-500/15 via-violet-500/15 to-fuchsia-500/15 border border-black/5 px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap">
+              <div className="max-w-[78%] rounded-2xl rounded-br-sm bg-gradient-to-r from-cyan-500/15 via-violet-500/15 to-fuchsia-500/15 border border-black/5 dark:border-white/10 px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap">
                 {m.text}
               </div>
             </div>
@@ -237,10 +237,10 @@ export function ChatView({
                   <span className="w-6 h-6 rounded-full bg-gradient-to-r from-cyan-500 to-fuchsia-500 flex items-center justify-center text-white text-[10px] font-mono font-bold">
                     S
                   </span>
-                  <span className="text-xs font-medium text-slate-500">Synth</span>
+                  <span className="text-xs font-medium text-muted">Synth</span>
                 </div>
                 <div className="tilt-scene">
-                  <div className="tilt-card glass rounded-2xl border border-black/5 p-5">
+                  <div className="tilt-card glass rounded-2xl border border-black/5 dark:border-white/10 p-5">
                     <div className="tilt-card-inner">
                       <ReportBody run={m.run} />
                     </div>
@@ -255,13 +255,13 @@ export function ChatView({
                   <span className="w-6 h-6 rounded-full bg-gradient-to-r from-cyan-500 to-fuchsia-500 flex items-center justify-center text-white text-[10px] font-mono font-bold">
                     S
                   </span>
-                  <span className="text-xs font-medium text-slate-500">Synth</span>
+                  <span className="text-xs font-medium text-muted">Synth</span>
                 </div>
                 <div
                   className={`rounded-2xl rounded-tl-sm px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap ${
                     m.kind === 'error'
                       ? 'bg-rose-50 border border-rose-200 text-rose-700'
-                      : 'bg-white/80 border border-black/5 text-slate-700'
+                      : 'bg-surface/80 border border-black/5 dark:border-white/10 text-ink'
                   }`}
                 >
                   {m.text}
@@ -279,7 +279,7 @@ export function ChatView({
                 <span className="w-6 h-6 rounded-full bg-gradient-to-r from-cyan-500 to-fuchsia-500 flex items-center justify-center text-white text-[10px] font-mono font-bold animate-pulse">
                   S
                 </span>
-                <span className="text-xs font-medium text-slate-500">swarm in flight</span>
+                <span className="text-xs font-medium text-muted">swarm in flight</span>
               </div>
               <LiveSwarmPanel run={currentRun} />
             </div>
@@ -291,7 +291,7 @@ export function ChatView({
       <form onSubmit={submit} className="p-4 lg:px-8 pb-6 pt-2">
         <div className="relative group">
           <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-cyan-400 via-violet-400 to-fuchsia-400 opacity-25 blur group-focus-within:opacity-60 transition-opacity" />
-          <div className="relative flex items-center gap-2 rounded-2xl bg-white border border-black/10 p-1.5">
+          <div className="relative flex items-center gap-2 rounded-2xl bg-surface border border-black/10 dark:border-white/10 p-1.5">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -326,19 +326,19 @@ function LiveSwarmPanel({ run }: { run: RunModel }) {
   const active = run.tasks.length > 0;
 
   return (
-    <div className="rounded-2xl border border-black/8 bg-white/60 backdrop-blur p-5 overflow-hidden">
+    <div className="rounded-2xl border border-black/8 dark:border-white/10 bg-surface/60 backdrop-blur p-5 overflow-hidden">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-violet-500" />
           </span>
-          <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-slate-500">
+          <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted">
             {run.plan ? 'swarm deployed' : 'planning…'}
           </span>
         </div>
         <div className="flex items-center gap-3 font-mono text-[10px]">
-          <span className="text-slate-500">ACTIVE {counts.working}</span>
+          <span className="text-muted">ACTIVE {counts.working}</span>
           <span className="text-emerald-600">DONE {counts.done}</span>
           <span className="text-rose-600">FAIL {counts.failed}</span>
         </div>
@@ -389,7 +389,7 @@ function MiniReport({ task, index }: { task: RunModel['tasks'][number]; index: n
         >
           {status}
         </span>
-        <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400">
+        <span className="font-mono text-[9px] uppercase tracking-wider text-muted">
           A{index + 1}
         </span>
       </div>
@@ -409,14 +409,14 @@ function ReportBody({ run }: { run: RunModel }) {
         <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-emerald-600">
           ◈ Final Report
         </span>
-        <div className="flex items-center gap-3 font-mono text-[10px] text-slate-400">
+        <div className="flex items-center gap-3 font-mono text-[10px] text-muted">
           <span>{(run.report?.loopsUsed ?? 1)} loop{(run.report?.loopsUsed ?? 1) > 1 ? 's' : ''}</span>
           <span>{run.tasks.filter((t) => t.status === 'done').length} agents</span>
         </div>
       </div>
 
       {run.report?.summary && (
-        <p className="text-[15px] leading-relaxed text-slate-800 whitespace-pre-wrap">
+        <p className="text-[15px] leading-relaxed text-ink whitespace-pre-wrap">
           {run.report.summary}
         </p>
       )}
@@ -428,7 +428,7 @@ function ReportBody({ run }: { run: RunModel }) {
               <h4 className="font-mono text-xs uppercase tracking-widest text-violet-600 mb-1">
                 {s.title}
               </h4>
-              <p className="text-sm leading-relaxed text-slate-600 whitespace-pre-wrap">
+              <p className="text-sm leading-relaxed text-muted whitespace-pre-wrap">
                 {s.content}
               </p>
             </div>
@@ -444,7 +444,7 @@ function ReportBody({ run }: { run: RunModel }) {
                 <h4 className="font-mono text-xs uppercase tracking-widest text-violet-600 mb-1">
                   {t.title}
                 </h4>
-                <p className="text-sm leading-relaxed text-slate-600 whitespace-pre-wrap">
+                  <p className="text-sm leading-relaxed text-muted whitespace-pre-wrap">
                   {t.result}
                 </p>
               </div>
@@ -453,7 +453,7 @@ function ReportBody({ run }: { run: RunModel }) {
       )}
 
       {run.gaps.length > 0 && (
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+        <div className="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 p-3">
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-amber-700 mb-1">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             Loop {run.gaps.length} — gaps detected

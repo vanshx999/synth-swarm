@@ -25,6 +25,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="scroll-smooth">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(() => { let t = localStorage.getItem('theme'); if (t !== 'light' && t !== 'dark' && t !== 'system') { t = 'system'; localStorage.setItem('theme', t); } const dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.classList.toggle('dark', dark); document.documentElement.classList.toggle('light', t === 'light'); })();`,
+          }}
+        />
+      </head>
       <body
         className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} font-tech bg-canvas text-ink antialiased min-h-screen`}
       >

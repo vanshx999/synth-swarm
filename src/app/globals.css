@@ -12,6 +12,22 @@
   --brand-fuchsia: #d946ef;
 }
 
+.dark {
+  --canvas: #0b0f19;
+  --surface: #111827;
+  --ink: #e5e7eb;
+  --muted: #94a3b8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --canvas: #0b0f19;
+    --surface: #111827;
+    --ink: #e5e7eb;
+    --muted: #94a3b8;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -41,6 +57,10 @@ body {
 }
 .custom-scroll::-webkit-scrollbar-track {
   background: rgba(11, 15, 25, 0.04);
+}
+.dark .custom-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.08); }
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .custom-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.08); }
 }
 .custom-scroll::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, rgba(14, 165, 233, 0.5), rgba(139, 92, 246, 0.5));
@@ -103,6 +123,16 @@ body {
   background-size: 26px 26px;
   mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 15%, transparent 75%);
   -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 15%, transparent 75%);
+}
+
+.dark .dots-overlay { background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px); }
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .dots-overlay { background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px); }
+}
+
+.dark .aurora-blob { opacity: 0.22; }
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .aurora-blob { opacity: 0.22; }
 }
 
 @keyframes aurora-drift {
@@ -212,4 +242,9 @@ body {
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+}
+
+.dark .glass { background: rgba(17, 24, 39, 0.72); }
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .glass { background: rgba(17, 24, 39, 0.72); }
 }

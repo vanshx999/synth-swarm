@@ -8,6 +8,7 @@ import type { RunModel } from '@/lib/runModel';
 import { applyEvent, emptyRun } from '@/lib/runModel';
 import { ChatView } from '@/components/ChatView';
 import { KanbanView } from '@/components/KanbanView';
+import ThemeToggle from '@/components/ThemeToggle';
 
 type ViewMode = 'chat' | 'kanban';
 
@@ -95,31 +96,31 @@ export default function DashboardPage() {
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-20 lg:hidden"
+          className="fixed inset-0 bg-black/30 dark:bg-black/60 backdrop-blur-sm z-20 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-30 w-72 shrink-0 glass border-r border-black/8 flex flex-col transition-transform duration-300 lg:translate-x-0 ${
+        className={`fixed lg:static inset-y-0 left-0 z-30 w-72 shrink-0 glass border-r border-black/8 dark:border-white/10 flex flex-col transition-transform duration-300 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Brand */}
-        <div className="flex items-center gap-2 px-5 py-5 border-b border-black/5">
+        <div className="flex items-center gap-2 px-5 py-5 border-b border-black/5 dark:border-white/10">
           <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500 via-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold shadow-brand-glow">
             S
           </span>
           <div className="flex-1 min-w-0">
             <div className="font-bold tracking-tight leading-none">Synth</div>
-            <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-slate-400 mt-1">
+            <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted mt-1">
               swarm research
             </div>
           </div>
           <button
             onClick={confirmLogout}
-            className="text-slate-400 hover:text-rose-500 transition-colors">
+            className="text-muted hover:text-rose-500 transition-colors">
             {/* logout icon */}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -150,11 +151,11 @@ export default function DashboardPage() {
 
         {/* History */}
         <div className="flex-1 overflow-y-auto custom-scroll px-3 py-4 space-y-1.5">
-          <div className="px-2 pb-1 font-mono text-[9px] uppercase tracking-[0.25em] text-slate-400">
+          <div className="px-2 pb-1 font-mono text-[9px] uppercase tracking-[0.25em] text-muted">
             Recent swarms
           </div>
           {history.length === 0 && (
-            <div className="px-2 text-xs text-slate-400 leading-relaxed">
+            <div className="px-2 text-xs text-muted leading-relaxed">
               No runs yet. Ask the swarm something!
             </div>
           )}
@@ -167,17 +168,17 @@ export default function DashboardPage() {
               }}
               className={`w-full text-left rounded-xl px-3 py-2.5 border transition-all duration-200 group ${
                 selectedId === h.id
-                  ? 'bg-white border-violet-200 shadow-[0_0_0_1px_rgba(139,92,246,0.2)]'
-                  : 'bg-white/50 border-black/5 hover:bg-white hover:border-violet-200/60 hover:shadow-soft'
+                  ? 'bg-surface border-violet-200 shadow-[0_0_0_1px_rgba(139,92,246,0.2)]'
+                  : 'bg-surface/50 border-black/5 dark:border-white/10 hover:bg-surface hover:border-violet-200/60 hover:shadow-soft'
               }`}
             >
-              <div className="text-[13px] font-medium truncate text-slate-800">{h.topic}</div>
-              <div className="text-[11px] text-slate-400 truncate mt-0.5">
+              <div className="text-[13px] font-medium truncate text-ink">{h.topic}</div>
+              <div className="text-[11px] text-muted truncate mt-0.5">
                 {h.report?.summary?.slice(0, 140) ||
                   (h.error ? `Error: ${h.error}` : 'Run in history')}
               </div>
               <div className="flex items-center justify-between mt-1.5">
-                <span className="font-mono text-[9px] text-slate-400">
+                <span className="font-mono text-[9px] text-muted">
                   {new Date(h.createdAt).toLocaleString('en-US', {
                     month: 'short',
                     day: 'numeric',
@@ -186,7 +187,7 @@ export default function DashboardPage() {
                   })}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="font-mono text-[9px] uppercase px-1 rounded bg-white/60 border border-black/5 text-slate-500">
+                  <span className="font-mono text-[9px] uppercase px-1 rounded bg-surface/60 border border-black/5 dark:border-white/10 text-muted">
                     {h.provider}
                   </span>
                   {h.report ? (
@@ -203,13 +204,13 @@ export default function DashboardPage() {
         </div>
 
         {/* User */}
-        <div className="px-4 py-4 border-t border-black/5 flex items-center gap-3">
+        <div className="px-4 py-4 border-t border-black/5 dark:border-white/10 flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm">
             {(session?.name || 'B')[0].toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold truncate">{session?.name || 'Builder'}</div>
-            <div className="text-[11px] text-slate-400 truncate">{session?.email}</div>
+            <div className="text-[11px] text-muted truncate">{session?.email}</div>
           </div>
         </div>
       </aside>
@@ -217,10 +218,10 @@ export default function DashboardPage() {
       {/* Main */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Topbar */}
-        <header className="flex items-center gap-3 px-4 lg:px-6 py-3 border-b border-black/5 bg-white/40 backdrop-blur">
+        <header className="flex items-center gap-3 px-4 lg:px-6 py-3 border-b border-black/5 dark:border-white/10 bg-surface/40 backdrop-blur">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 -ml-1 text-slate-500 hover:text-slate-800"
+            className="lg:hidden p-2 -ml-1 text-muted hover:text-ink"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="3" y1="6" x2="21" y2="6" />
@@ -230,13 +231,13 @@ export default function DashboardPage() {
           </button>
 
           {/* Mode toggle: Chat | Kanban */}
-          <div className="flex items-center gap-1 rounded-full bg-black/5 p-1">
+          <div className="flex items-center gap-1 rounded-full bg-black/5 dark:bg-white/10 p-1">
             <button
               onClick={() => setMode('chat')}
               className={`font-mono text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full transition-all ${
                 mode === 'chat'
-                  ? 'bg-white text-ink shadow-soft'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'bg-surface text-ink shadow-soft'
+                  : 'text-muted hover:text-ink'
               }`}
             >
               💬 Chat
@@ -245,8 +246,8 @@ export default function DashboardPage() {
               onClick={() => setMode('kanban')}
               className={`font-mono text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full transition-all ${
                 mode === 'kanban'
-                  ? 'bg-white text-ink shadow-soft'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'bg-surface text-ink shadow-soft'
+                  : 'text-muted hover:text-ink'
               }`}
             >
               🗂 Kanban
@@ -265,12 +266,13 @@ export default function DashboardPage() {
                     ? p === 'groq'
                       ? 'bg-violet-500 text-white border-violet-500'
                       : 'bg-cyan-500 text-white border-cyan-500'
-                    : 'bg-white/60 text-slate-500 border-black/10 hover:text-slate-700'
+                    : 'bg-surface/60 text-muted border-black/10 dark:border-white/10 hover:text-ink'
                 }`}
               >
                 {p === 'groq' ? '⚡ Groq' : '◈ Demo'}
               </button>
             ))}
+            <ThemeToggle />
           </div>
         </header>
 

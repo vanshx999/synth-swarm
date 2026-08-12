@@ -171,12 +171,24 @@ export function Swarm3D({ active, count = 240, className = '' }: Swarm3DProps) {
     const starGeo = new THREE.BufferGeometry();
     starGeo.setAttribute('position', new THREE.BufferAttribute(stars, 3));
     const starMat = new THREE.PointsMaterial({
-      color: 0xffffff,
+      color: document.documentElement.classList.contains('dark') ? 0xffffff : 0x0b0f19,
       size: 0.08,
       transparent: true,
       opacity: 0.35,
     });
-    scene.add(new THREE.Points(starGeo, starMat));
+    const starsMesh = new THREE.Points(starGeo, starMat);
+    scene.add(starsMesh);
+
+    const applyTheme = () => {
+      const dark = document.documentElement.classList.contains('dark');
+      starMat.color.setHex(dark ? 0xffffff : 0x0b0f19);
+      starMat.opacity = dark ? 0.35 : 0.22;
+      haloMat.opacity = dark ? 0.85 : 0.65;
+      coreMat.color.setHex(dark ? 0xe5e7eb : 0xffffff);
+    };
+    const themeObserver = new MutationObserver(applyTheme);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    applyTheme();
 
     /* ---------- clock loop ---------- */
     const clock = new THREE.Clock();
@@ -253,6 +265,7 @@ export function Swarm3D({ active, count = 240, className = '' }: Swarm3DProps) {
 
     return () => {
       cancelAnimationFrame(raf);
+      themeObserver.disconnect();
       window.removeEventListener('resize', onResize);
       renderer.dispose();
       if (renderer.domElement.parentElement === mount) {
