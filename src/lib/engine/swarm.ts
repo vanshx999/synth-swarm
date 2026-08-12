@@ -200,7 +200,7 @@ ${body}`;
         const parsed = JSON.parse(json);
         const reportRaw = parsed && typeof parsed === 'object' && parsed.report ? parsed.report : parsed;
         report = this.normalizeReport(reportRaw, loopNum);
-        gap = this.normalizeGap(parsed?.gap);
+        gap = this.normalizeGap(parsed?.gap ?? parsed?.gaps);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown synthesis error';
