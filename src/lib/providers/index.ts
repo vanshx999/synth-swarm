@@ -363,7 +363,7 @@ export class GroqProvider implements LLMProvider {
     return content;
   }
 
-  private getSystemPrompt(role: string): string {
+  getSystemPrompt(role: string): string {
     const prompts: Record<string, string> = {
       planner:
         'You are a world-class research director. Decompose the topic into 5-7 distinct research angles that together provide complete coverage. Each task must have a clear, specific research question as the title. Return valid JSON with "tasks" array and "reasoning" string. Each task: {id, title, status:"pending"}. Output ONLY the JSON object, no markdown.',
