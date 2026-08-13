@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { SwarmEvent } from '@/lib/types';
+import type { SearchProvider, SwarmEvent } from '@/lib/types';
 import type { RunModel } from '@/lib/runModel';
 import { applyEvent, emptyRun } from '@/lib/runModel';
 import { newId } from '@/lib/history';
@@ -32,6 +32,7 @@ interface ChatViewProps {
   sessionToken?: number;
   onSaveRun: (run: RunModel, topic: string, events: SwarmEvent[]) => void;
   onActiveRunChange: (run: RunModel | null) => void;
+  searchProvider: SearchProvider;
 }
 
 export function ChatView({
@@ -41,12 +42,14 @@ export function ChatView({
   sessionToken = 0,
   onSaveRun,
   onActiveRunChange,
+  searchProvider,
 }: ChatViewProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [running, setRunning] = useState(false);
   const [currentRun, setCurrentRun] = useState<RunModel | null>(null);
   const [activeRuns, setActiveRuns] = useState<Map<string, RunModel>>(new Map());
+  const [metrics, setMetrics] = useState({ researcher: 0, synthesis: 0, loops: 0 });
   const scrollRef = useRef<HTMLDivElement>(null);
   const eventsRef = useRef<Map<string, SwarmEvent[]>>(new Map());
   const activeRunCount = useRef(0);
@@ -70,6 +73,7 @@ export function ChatView({
     activeRunCount.current = 0;
     eventsRef.current = new Map();
     followUpBaseRef.current = null;
+    setMetrics({ researcher: 0, synthesis: 0, loops: 0 });
   }, [sessionToken]);
 
   // When a run from history is loaded externally, show it as a report message
@@ -204,6 +208,7 @@ export function ChatView({
         body: JSON.stringify({
           topic: text,
           sessionId,
+          searchProvider,
         }),
       });
 
@@ -214,6 +219,9 @@ export function ChatView({
       const decoder = new TextDecoder();
       let buffer = '';
       let runState = run;
+      let planStart = 0;
+      let firstWorkerStart = 0;
+      let synthesisStart = 0;
 
       try {
         // eslint-disable-next-line no-constant-condition
@@ -232,6 +240,25 @@ export function ChatView({
               if (!raw || raw === '[DONE]') continue;
               try {
                 const evt = JSON.parse(raw) as SwarmEvent;
+                if (evt.type === 'plan_ready') {
+                  planStart = Date.now();
+                } else if (evt.type === 'task_update' && evt.task.status === 'working' && !firstWorkerStart) {
+                  firstWorkerStart = Date.now();
+                } else if (evt.type === 'task_update' && evt.task.status === 'done' && !synthesisStart) {
+                  const allFinished = runState.tasks.length > 0 && runState.tasks.every((task) =>
+                    task.id === evt.task.id ? evt.task.status !== 'working' : task.status === 'done' || task.status === 'failed'
+                  );
+                  if (allFinished) synthesisStart = Date.now();
+                } else if (evt.type === 'final_report') {
+                  const completedAt = Date.now();
+                  const workerStart = firstWorkerStart || planStart || completedAt;
+                  const synthesisAt = synthesisStart || completedAt;
+                  setMetrics({
+                    researcher: Math.max(0, synthesisAt - workerStart),
+                    synthesis: Math.max(0, completedAt - synthesisAt),
+                    loops: evt.report.loopsUsed,
+                  });
+                }
                 runState = handleEvent(sessionId, runState, evt);
               } catch {
                 /* ignore non-JSON frames */
@@ -376,6 +403,14 @@ export function ChatView({
       </div>
 
       {/* Input */}
+      <footer className="p-4 text-[10px] text-muted border-t border-black/5">
+        <div className="flex items-center gap-4">
+          <span>Researcher: {metrics.researcher > 0 ? `${Math.round(metrics.researcher / 1000)}s` : '—'}</span>
+          <span>Synthesis: {metrics.synthesis > 0 ? `${Math.round(metrics.synthesis / 1000)}s` : '—'}</span>
+          <span>Loops: {metrics.loops}</span>
+        </div>
+      </footer>
+
       <form onSubmit={submit} className="p-4 lg:px-8 pb-6 pt-2">
         <div className="relative group">
           <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep opacity-25 blur group-focus-within:opacity-60 transition-opacity" />
@@ -389,7 +424,7 @@ export function ChatView({
             <button
               type="submit"
               disabled={!input.trim()}
-              className="disabled:opacity-40 px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep text-white text-sm font-semibold transition-transform hover:scale-[1.03] active:scale-[0.97]"
+              className="disabled:opacity-40 px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep text-white text-sm font-semibold transition-transform hover:scale-[1.03] active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
             >
               {running ? 'Running…' : 'Send ⚡'}
             </button>

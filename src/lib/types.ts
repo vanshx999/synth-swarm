@@ -53,6 +53,10 @@ export interface LLMProvider {
 
 export interface ProviderConfig {
   groqApiKey?: string;
+  exaApiKey?: string;
+  searchProvider?: SearchProvider;
 }
+
+export type SearchProvider = 'tavily' | 'exa';
 
 export type SwarmEventCallback = (event: SwarmEvent) => void;

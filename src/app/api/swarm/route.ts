@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server';
 import { SwarmEngine } from '@/lib/engine/swarm';
 import { getProvider } from '@/lib/providers/index';
-import type { ProviderConfig, SwarmEvent, SwarmEventCallback } from '@/lib/types';
+import type { ProviderConfig, SearchProvider, SwarmEvent, SwarmEventCallback } from '@/lib/types';
 
 const KEEPALIVE_INTERVAL_MS = 15_000;
 
 export async function POST(request: NextRequest) {
-  let body: { topic?: unknown };
+  let body: { topic?: unknown; searchProvider?: unknown };
 
   try {
     body = await request.json();
@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
 
   const config: ProviderConfig = {
     groqApiKey,
+    exaApiKey: process.env.EXA_API_KEY,
+    searchProvider: body.searchProvider === 'exa' ? ('exa' as SearchProvider) : 'tavily',
   };
 
   const encoder = new TextEncoder();
