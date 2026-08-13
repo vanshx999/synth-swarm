@@ -7,6 +7,7 @@ import { applyEvent, emptyRun } from '@/lib/runModel';
 import { newId } from '@/lib/history';
 import { displayTitle, followUpBase } from '@/lib/topic';
 import Swarm3D from '@/components/Swarm3D';
+import { Tilt } from '@/components/Tilt';
 
 // Continuation phrases that mean "go deeper on the previous topic" rather than
 // a brand-new research subject. Matched against the whole trimmed input.
@@ -64,7 +65,14 @@ export function ChatView({
   const followUpBaseRef = useRef<string | null>(null);
 
   const welcome =
-    "Hi! I'm Synth. Give me a topic and I'll dispatch a fleet of parallel agents to research it — then synthesize a full report. Try something like *'state of AI startups in India'*.";
+    "Hi! I'm Synth. Give me a topic and I'll dispatch a fleet of parallel agents to research it — then synthesize a full report.";
+
+  const SUGGESTIONS = [
+    'State of AI startups in India',
+    'How do fusion reactors actually work?',
+    'Compare NVIDIA vs AMD in 2026',
+    'What caused the fall of the Roman Empire?',
+  ];
 
   const bootMessages = (): Message[] => [
     { id: 'welcome', role: 'assistant', text: welcome, kind: 'text', at: Date.now() },
@@ -380,7 +388,9 @@ export function ChatView({
                   <span className="text-xs font-medium text-muted">Synth</span>
                 </div>
                 <div className="glass rounded-2xl border border-black/5 dark:border-white/10 p-5">
-                  <ReportBody run={m.run} />
+                  <Tilt max={3}>
+                    <ReportBody run={m.run} />
+                  </Tilt>
                 </div>
               </div>
             </div>
@@ -405,6 +415,29 @@ export function ChatView({
               </div>
             </div>
           )
+        )}
+
+        {/* Suggested topics — quick-start chips on a fresh composer */}
+        {messages.length === 1 && !running && (
+          <div className="flex flex-col gap-2">
+            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted px-1">
+              Try one of these
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setInput(s)}
+                  className="group flex items-center gap-2 rounded-full border border-black/10 dark:border-white/10 bg-surface/70 px-3.5 py-2 text-[13px] text-muted hover:text-ink hover:border-brand-primary/60 hover:shadow-soft"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-brand-primary to-brand-deep opacity-70 group-hover:opacity-100" />
+                  {s}
+                  <span className="text-brand-deep dark:text-brand-highlight opacity-0 group-hover:opacity-100 transition-opacity">↗</span>
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Live swarm panel — shown while running */}
@@ -439,7 +472,13 @@ export function ChatView({
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask the swarm to research anything…"
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                  e.preventDefault();
+                  void launch(input);
+                }
+              }}
+              placeholder="Research anything…"
               className="flex-1 px-3 py-2.5 bg-transparent focus:outline-none text-[15px]"
             />
             <button
@@ -447,9 +486,13 @@ export function ChatView({
               disabled={!input.trim()}
               className="disabled:opacity-40 px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep text-[#053B36] text-sm font-semibold btn-3d focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
             >
-              {running ? 'Running…' : 'Send ⚡'}
+              {running ? 'Running…' : 'Deploy swarm →'}
             </button>
           </div>
+        </div>
+        <div className="mt-1.5 flex items-center justify-between px-2">
+          <span className="font-mono text-[10px] text-muted">⌘ / Ctrl + Enter to deploy</span>
+          <span className="font-mono text-[10px] text-muted/60">5 concurrent swarms max</span>
         </div>
       </form>
     </div>

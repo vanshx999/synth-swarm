@@ -371,7 +371,14 @@ export default function DashboardPage() {
           </div>
 
           {/* Provider */}
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="ml-auto flex items-center gap-2">
+            <span className="hidden sm:flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+              </span>
+              Live
+            </span>
             <span className="font-mono text-[9px] uppercase tracking-widest px-3 py-1 rounded-full border bg-brand-deep text-white border-brand-deep">
               ⚡ Groq
             </span>

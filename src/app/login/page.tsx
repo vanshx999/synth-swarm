@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { getSession, login } from '@/lib/history';
 import Swarm3D from '@/components/Swarm3D';
 import ThemeToggle from '@/components/ThemeToggle';
+import { Tilt } from '@/components/Tilt';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -59,18 +60,27 @@ export default function LoginPage() {
             A fleet of parallel AI agents plans, researches, synthesizes, and
             loops — until every angle is covered.
           </p>
+          <div className="mt-6 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.3em] text-muted">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+            </span>
+            Swarm engine online
+          </div>
           <div className="mt-8 grid grid-cols-3 gap-4">
             {[
               ['6', 'agents / swarm'],
               ['3', 'loop passes'],
               ['1', 'pipeline'],
             ].map(([n, label]) => (
-              <div key={label} className="glass rounded-2xl p-4 text-center hover-lift">
-                <div className="text-2xl font-bold gradient-text">{n}</div>
-                <div className="text-[11px] text-muted uppercase tracking-wider mt-1">
-                  {label}
+              <Tilt key={label} max={10}>
+                <div className="glass rounded-2xl p-4 text-center hover-lift">
+                  <div className="text-2xl font-bold gradient-text">{n}</div>
+                  <div className="text-[11px] text-muted uppercase tracking-wider mt-1">
+                    {label}
+                  </div>
                 </div>
-              </div>
+              </Tilt>
             ))}
           </div>
         </div>
