@@ -35,6 +35,8 @@ The AO Kanban board and agent sessions are shown in the demo video.
 
 ## Demo
 
+**Live:** https://synth-swarm.vercel.app
+
 1. Open the app and sign in with any email (demo build — no password).
 2. Pick a suggested topic or type your own, then hit **Deploy swarm →**.
 3. Watch the swarm: an orchestrator core with orbiting agents that change color as
