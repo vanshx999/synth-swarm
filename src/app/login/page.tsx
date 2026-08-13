@@ -45,7 +45,7 @@ export default function LoginPage() {
         </div>
         <div className="relative z-10 max-w-md">
           <div className="flex items-center gap-2 mb-6">
-            <span className="w-3 h-3 rounded-full bg-gradient-to-r from-cyan-500 to-fuchsia-500 animate-pulse" />
+            <span className="w-3 h-3 rounded-full bg-gradient-to-r from-brand-primary to-brand-deep animate-pulse" />
             <span className="font-mono text-sm uppercase tracking-[0.35em] gradient-text font-bold">
               Synth
             </span>
@@ -83,7 +83,7 @@ export default function LoginPage() {
       <div className="flex items-center justify-center p-6 sm:p-12">
         <div className="w-full max-w-sm">
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <span className="w-3 h-3 rounded-full bg-gradient-to-r from-cyan-500 to-fuchsia-500" />
+            <span className="w-3 h-3 rounded-full bg-gradient-to-r from-brand-primary to-brand-deep" />
             <span className="font-mono text-sm uppercase tracking-[0.35em] gradient-text font-bold">
               Synth
             </span>
@@ -105,7 +105,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full px-4 py-3 rounded-xl border border-black/10 dark:border-white/10 bg-surface text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-violet-500/40 transition-shadow"
+                className="w-full px-4 py-3 rounded-xl border border-black/10 dark:border-white/10 bg-surface text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/40 transition-shadow"
               />
             </div>
             <div>
@@ -117,14 +117,14 @@ export default function LoginPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Builder"
-                className="w-full px-4 py-3 rounded-xl border border-black/10 dark:border-white/10 bg-surface text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-violet-500/40 transition-shadow"
+                className="w-full px-4 py-3 rounded-xl border border-black/10 dark:border-white/10 bg-surface text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/40 transition-shadow"
               />
             </div>
 
             <button
               type="submit"
               disabled={!email.trim()}
-              className="group relative w-full rounded-xl bg-gradient-to-r from-cyan-500 via-violet-500 to-fuchsia-500 p-px disabled:opacity-40 disabled:cursor-not-allowed transition-transform hover:scale-[1.01] active:scale-[0.99]"
+              className="group relative w-full rounded-xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep p-px disabled:opacity-40 disabled:cursor-not-allowed transition-transform hover:scale-[1.01] active:scale-[0.99]"
             >
               <span className="flex items-center justify-center gap-2 px-6 py-3 rounded-[11px] bg-surface/90 font-semibold text-sm text-ink transition-colors group-hover:bg-transparent group-hover:text-white">
                 Launch Console →

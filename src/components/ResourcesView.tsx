@@ -46,7 +46,7 @@ export function ResourcesView({ run }: ResourcesViewProps) {
       <div className="flex items-center justify-between mb-4 px-1">
         <div>
           <h2 className="text-lg font-bold flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-cyan-500 to-fuchsia-500" />
+            <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-brand-primary to-brand-deep" />
             Resources
           </h2>
           <p className="text-xs text-muted mt-0.5 truncate">
@@ -85,7 +85,7 @@ export function ResourcesView({ run }: ResourcesViewProps) {
                       href={src.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm font-medium text-ink hover:text-violet-500 transition-colors break-words"
+                      className="text-sm font-medium text-ink hover:text-brand-deep dark:hover:text-brand-highlight transition-colors break-words"
                     >
                       {src.title}
                     </a>

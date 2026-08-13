@@ -9,7 +9,7 @@ interface KanbanViewProps {
 
 const COLUMNS = [
   { key: 'pending', label: 'Queued', accent: 'text-muted', dot: 'bg-slate-400', ring: 'border-slate-300 dark:border-slate-600' },
-  { key: 'working', label: 'In Progress', accent: 'text-cyan-600', dot: 'bg-cyan-500', ring: 'border-cyan-400' },
+  { key: 'working', label: 'In Progress', accent: 'text-brand-deep', dot: 'bg-brand-primary', ring: 'border-brand-primary' },
   { key: 'done', label: 'Complete', accent: 'text-emerald-600', dot: 'bg-emerald-500', ring: 'border-emerald-400' },
   { key: 'failed', label: 'Failed', accent: 'text-rose-600', dot: 'bg-rose-500', ring: 'border-rose-400' },
 ] as const;
@@ -22,9 +22,9 @@ const CARD_STYLES: Record<
 > = {
   pending: { border: 'border-slate-200 dark:border-slate-600', head: 'text-muted', badge: 'bg-slate-100 dark:bg-slate-700 text-muted' },
   working: {
-    border: 'border-cyan-300 dark:border-cyan-500/60',
-    head: 'text-cyan-700',
-    badge: 'bg-cyan-100 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-300',
+    border: 'border-brand-primary/60',
+    head: 'text-brand-deep dark:text-brand-highlight',
+    badge: 'bg-brand-support/60 dark:bg-brand-deep/50 text-brand-deep dark:text-brand-highlight',
   },
   done: {
     border: 'border-emerald-300 dark:border-emerald-500/60',
@@ -65,7 +65,7 @@ export function KanbanView({ run }: KanbanViewProps) {
       <div className="flex items-center justify-between mb-4 px-1">
         <div>
           <h2 className="text-lg font-bold flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-cyan-500 to-fuchsia-500" />
+            <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-brand-primary to-brand-deep" />
             Swarm Kanban
           </h2>
           <p className="text-xs text-muted mt-0.5 truncate">
@@ -101,7 +101,7 @@ export function KanbanView({ run }: KanbanViewProps) {
           <div
             key={col.key}
             className={`rounded-2xl border ${col.ring} bg-surface/60 backdrop-blur p-3 flex flex-col min-h-0 ${
-              col.key === 'working' ? 'ring-2 ring-cyan-500/10' : ''
+              col.key === 'working' ? 'ring-2 ring-brand-primary/20' : ''
             }`}
           >
             <div className={`flex items-center gap-2 px-1 pb-2 font-mono text-[10px] uppercase tracking-[0.2em] ${col.accent}`}>
@@ -116,7 +116,7 @@ export function KanbanView({ run }: KanbanViewProps) {
                 return (
                   <div
                     key={t.id}
-                    className={`rounded-xl border ${style.border} bg-surface p-3 transition-all duration-300 hover:shadow-[0_4px_16px_rgba(139,92,246,0.12),0_0_0_1px_rgba(139,92,246,0.35)] hover:-translate-y-0.5 ${
+                    className={`rounded-xl border ${style.border} bg-surface p-3 transition-all duration-300 hover:shadow-card-hover hover:-translate-y-0.5 ${
                       col.key === 'working' ? 'animate-think' : ''
                     }`}
                   >
@@ -132,7 +132,7 @@ export function KanbanView({ run }: KanbanViewProps) {
                       {displayTitle(t.title)}
                     </div>
                     {t.status === 'working' && t.thinking && (
-                      <div className="mt-1.5 font-mono text-[10px] text-cyan-600 animate-think">{t.thinking}</div>
+                      <div className="mt-1.5 font-mono text-[10px] text-brand-deep dark:text-brand-highlight animate-think">{t.thinking}</div>
                     )}
                     {(t.status === 'done' && t.result) || (t.status === 'failed' && t.error) ? (
                       <div className="mt-1.5 text-[11px] leading-snug text-muted line-clamp-3 whitespace-pre-wrap">

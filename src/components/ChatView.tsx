@@ -302,7 +302,7 @@ export function ChatView({
         {messages.map((m) =>
           m.role === 'user' ? (
             <div key={m.id} className="flex justify-end">
-              <div className="max-w-[78%] rounded-2xl rounded-br-sm bg-gradient-to-r from-cyan-500/15 via-violet-500/15 to-fuchsia-500/15 border border-black/5 dark:border-white/10 px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap">
+              <div className="max-w-[78%] rounded-2xl rounded-br-sm bg-gradient-to-r from-brand-primary/15 via-brand-highlight/15 to-brand-deep/15 border border-black/5 dark:border-white/10 px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap">
                 {m.text}
               </div>
             </div>
@@ -326,7 +326,7 @@ export function ChatView({
               <div className="max-w-[92%]">
                 {/* 3D avatar */}
                 <div className="flex items-center gap-2 mb-1.5">
-                  <span className="w-6 h-6 rounded-full bg-gradient-to-r from-cyan-500 to-fuchsia-500 flex items-center justify-center text-white text-[10px] font-mono font-bold">
+                  <span className="w-6 h-6 rounded-full bg-gradient-to-r from-brand-primary to-brand-deep flex items-center justify-center text-white text-[10px] font-mono font-bold">
                     S
                   </span>
                   <span className="text-xs font-medium text-muted">Synth</span>
@@ -340,7 +340,7 @@ export function ChatView({
             <div key={m.id} className="flex justify-start">
               <div className="max-w-[92%]">
                 <div className="flex items-center gap-2 mb-1.5">
-                  <span className="w-6 h-6 rounded-full bg-gradient-to-r from-cyan-500 to-fuchsia-500 flex items-center justify-center text-white text-[10px] font-mono font-bold">
+                  <span className="w-6 h-6 rounded-full bg-gradient-to-r from-brand-primary to-brand-deep flex items-center justify-center text-white text-[10px] font-mono font-bold">
                     S
                   </span>
                   <span className="text-xs font-medium text-muted">Synth</span>
@@ -364,7 +364,7 @@ export function ChatView({
           <div className="flex justify-start">
             <div className="w-full max-w-[92%]">
               <div className="flex items-center gap-2 mb-1.5">
-                <span className="w-6 h-6 rounded-full bg-gradient-to-r from-cyan-500 to-fuchsia-500 flex items-center justify-center text-white text-[10px] font-mono font-bold animate-pulse">
+                <span className="w-6 h-6 rounded-full bg-gradient-to-r from-brand-primary to-brand-deep flex items-center justify-center text-white text-[10px] font-mono font-bold animate-pulse">
                   S
                 </span>
                 <span className="text-xs font-medium text-muted">swarm in flight</span>
@@ -378,7 +378,7 @@ export function ChatView({
       {/* Input */}
       <form onSubmit={submit} className="p-4 lg:px-8 pb-6 pt-2">
         <div className="relative group">
-          <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-cyan-400 via-violet-400 to-fuchsia-400 opacity-25 blur group-focus-within:opacity-60 transition-opacity" />
+          <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep opacity-25 blur group-focus-within:opacity-60 transition-opacity" />
           <div className="relative flex items-center gap-2 rounded-2xl bg-surface border border-black/10 dark:border-white/10 p-1.5">
             <input
               value={input}
@@ -389,7 +389,7 @@ export function ChatView({
             <button
               type="submit"
               disabled={!input.trim()}
-              className="disabled:opacity-40 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 via-violet-500 to-fuchsia-500 text-white text-sm font-semibold transition-transform hover:scale-[1.03] active:scale-[0.97]"
+              className="disabled:opacity-40 px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep text-white text-sm font-semibold transition-transform hover:scale-[1.03] active:scale-[0.97]"
             >
               {running ? 'Running…' : 'Send ⚡'}
             </button>
@@ -413,8 +413,8 @@ function LiveSwarmPanel({ activeRuns }: { activeRuns: Map<string, RunModel> }) {
             {activeRuns.size} concurrent runs in flight
           </span>
           <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-violet-500" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-primary opacity-75" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-brand-primary" />
           </span>
         </div>
         <div className="space-y-4">
@@ -447,8 +447,8 @@ function SingleSwarmPanel({ run, compact = false }: { run: RunModel; compact?: b
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-violet-500" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-primary opacity-75" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-brand-primary" />
           </span>
           <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted">
             {run.plan ? 'swarm deployed' : 'planning…'}
@@ -480,9 +480,9 @@ function SingleSwarmPanel({ run, compact = false }: { run: RunModel; compact?: b
 
 function MiniReport({ task, index }: { task: RunModel['tasks'][number]; index: number }) {
   const palettes = [
-    { bg: 'bg-cyan-50 dark:bg-cyan-950/40', border: 'border-cyan-200 dark:border-cyan-800', text: 'text-cyan-700 dark:text-cyan-300', step: 'bg-cyan-500' },
-    { bg: 'bg-violet-50 dark:bg-violet-950/40', border: 'border-violet-200 dark:border-violet-800', text: 'text-violet-700 dark:text-violet-300', step: 'bg-violet-500' },
-    { bg: 'bg-fuchsia-50 dark:bg-fuchsia-950/40', border: 'border-fuchsia-200 dark:border-fuchsia-800', text: 'text-fuchsia-700 dark:text-fuchsia-300', step: 'bg-fuchsia-500' },
+    { bg: 'bg-brand-support/40 dark:bg-brand-deep/40', border: 'border-brand-primary/40', text: 'text-brand-deep dark:text-brand-highlight', step: 'bg-brand-primary' },
+    { bg: 'bg-brand-primary/10 dark:bg-brand-deep/50', border: 'border-brand-primary/50', text: 'text-brand-deep dark:text-brand-highlight', step: 'bg-brand-deep' },
+    { bg: 'bg-brand-deep/10 dark:bg-brand-deep/60', border: 'border-brand-deep/40', text: 'text-brand-deep dark:text-brand-highlight', step: 'bg-brand-highlight' },
     { bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-800', text: 'text-emerald-700 dark:text-emerald-300', step: 'bg-emerald-500' },
     { bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-800', text: 'text-amber-700 dark:text-amber-300', step: 'bg-amber-500' },
   ];
@@ -514,7 +514,7 @@ function MiniReport({ task, index }: { task: RunModel['tasks'][number]; index: n
       </div>
       <div className={`mt-1.5 text-[11px] leading-snug line-clamp-3 ${p.text}`}>{displayTitle(task.title)}</div>
       {task.status === 'working' && task.thinking && (
-        <div className="mt-1 font-mono text-[10px] text-cyan-600 dark:text-cyan-400 animate-think">
+        <div className="mt-1 font-mono text-[10px] text-brand-deep dark:text-brand-highlight animate-think">
           {task.thinking}
         </div>
       )}
@@ -555,7 +555,7 @@ function ReportBody({ run }: { run: RunModel }) {
         <div className="mt-4 space-y-4">
           {run.report.sections.map((s, i) => (
             <div key={i}>
-              <h4 className="font-mono text-xs uppercase tracking-widest text-violet-600 mb-1">
+              <h4 className="font-mono text-xs uppercase tracking-widest text-brand-deep dark:text-brand-highlight mb-1">
                 {s.title}
               </h4>
               <p className="text-sm leading-relaxed text-muted whitespace-pre-wrap">
@@ -571,7 +571,7 @@ function ReportBody({ run }: { run: RunModel }) {
             .filter((t) => t.status === 'done' && t.result)
             .map((t, i) => (
               <div key={t.id}>
-                <h4 className="font-mono text-xs uppercase tracking-widest text-violet-600 mb-1">
+                <h4 className="font-mono text-xs uppercase tracking-widest text-brand-deep dark:text-brand-highlight mb-1">
                   {t.title}
                 </h4>
                   <p className="text-sm leading-relaxed text-muted whitespace-pre-wrap">

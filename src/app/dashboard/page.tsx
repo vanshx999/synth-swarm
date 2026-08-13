@@ -100,7 +100,7 @@ export default function DashboardPage() {
   if (authed === null) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-3 h-3 rounded-full bg-gradient-to-r from-cyan-500 to-fuchsia-500 animate-ping" />
+        <div className="w-3 h-3 rounded-full bg-gradient-to-r from-brand-primary to-brand-deep animate-ping" />
       </div>
     );
   }
@@ -128,7 +128,7 @@ export default function DashboardPage() {
       >
         {/* Brand */}
         <div className="flex items-center gap-2 px-5 py-5 border-b border-black/5 dark:border-white/10">
-          <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500 via-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold shadow-brand-glow">
+          <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-primary via-brand-highlight to-brand-deep flex items-center justify-center text-white font-bold shadow-brand-glow">
             S
           </span>
           <div className="flex-1 min-w-0">
@@ -159,7 +159,7 @@ export default function DashboardPage() {
               setSidebarOpen(false);
               setSessionToken((t) => t + 1);
             }}
-            className="w-full flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 via-violet-500 to-fuchsia-500 text-white py-2.5 px-3 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98] shadow-brand-glow"
+            className="w-full flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep text-white py-2.5 px-3 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98] shadow-brand-glow"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
               <line x1="12" y1="5" x2="12" y2="19" />
@@ -197,8 +197,8 @@ export default function DashboardPage() {
               }}
               className={`w-full text-left rounded-xl px-3 py-2.5 border transition-all duration-200 group ${
                 selectedId === h.id
-                  ? 'bg-surface border-violet-200 shadow-[0_0_0_1px_rgba(139,92,246,0.2)]'
-                  : 'bg-surface/50 border-black/5 dark:border-white/10 hover:bg-surface hover:border-violet-200/60 hover:shadow-soft'
+                  ? 'bg-surface border-brand-primary shadow-[0_0_0_1px_rgba(84,186,185,0.25)]'
+                  : 'bg-surface/50 border-black/5 dark:border-white/10 hover:bg-surface hover:border-brand-primary/60 hover:shadow-soft'
               }`}
             >
               <div className='flex items-center gap-2'>
@@ -238,7 +238,7 @@ export default function DashboardPage() {
               </div>
               <button
                 type="button"
-                className="mt-2 text-[11px] font-medium text-violet-600 hover:text-violet-700"
+                className="mt-2 text-[11px] font-medium text-brand-deep dark:text-brand-highlight hover:text-brand-primary"
                 onClick={(event) => {
                   event.stopPropagation();
                   setSelectedId(null);
@@ -254,7 +254,7 @@ export default function DashboardPage() {
 
         {/* User */}
         <div className="px-4 py-4 border-t border-black/5 dark:border-white/10 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-primary to-brand-deep flex items-center justify-center text-white font-bold text-sm">
             {(session?.name || 'B')[0].toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
@@ -315,7 +315,7 @@ export default function DashboardPage() {
 
           {/* Provider */}
           <div className="ml-auto flex items-center gap-1.5">
-            <span className="font-mono text-[9px] uppercase tracking-widest px-3 py-1 rounded-full border bg-violet-500 text-white border-violet-500">
+            <span className="font-mono text-[9px] uppercase tracking-widest px-3 py-1 rounded-full border bg-brand-deep text-white border-brand-deep">
               ⚡ Groq
             </span>
             <ThemeToggle />
