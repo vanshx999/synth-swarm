@@ -17,3 +17,5 @@ out/
 
 # swarm cache
 .swarm-cache/
+.vercel
+.env*

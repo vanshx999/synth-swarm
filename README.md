@@ -17,6 +17,22 @@ research agents** investigates each one concurrently with real web search, a
 > Built for a hackathon with **Next.js 15**, **React 19**, **TypeScript**,
 > **Tailwind CSS**, and **Three.js**.
 
+## Built with Agent Orchestrator (AO)
+
+Synth was built end-to-end using **[Agent Orchestrator](https://aoagents.dev)**
+(AO) as the workspace:
+
+- **Planning** — AO agents decomposed the app into tasks (swarm engine, SSE
+  streaming, Three.js visualization, UI) and produced the initial architecture.
+- **Coding** — agent-driven sessions implemented the planner → swarm →
+  synthesize → loop pipeline, the `/api/swarm` SSE route, and the frontend views.
+- **Review & fix** — AO agents reviewed code, caught issues (e.g. per-chat
+  isolation, model rate-limit handling), and iterated on fixes.
+- **Tracking** — the build was tracked on the AO Kanban board from
+  *Queued → In Progress → Complete*.
+
+The AO Kanban board and agent sessions are shown in the demo video.
+
 ## Demo
 
 1. Open the app and sign in with any email (demo build — no password).
