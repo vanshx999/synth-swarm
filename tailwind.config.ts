@@ -15,14 +15,15 @@ const config: Config = {
         ink: 'var(--ink)',
         muted: 'var(--muted)',
         brand: {
-          cyan: '#0ea5e9',
-          violet: '#8b5cf6',
-          fuchsia: '#d946ef',
+          primary: 'var(--brand-primary)',
+          deep: 'var(--brand-deep)',
+          support: 'var(--brand-support)',
+          highlight: 'var(--brand-highlight)',
           emerald: '#10b981',
           amber: '#f59e0b',
           rose: '#f43f5e',
         },
-        'brand-grad': 'linear-gradient(135deg, #0ea5e9, #8b5cf6, #d946ef)',
+        'brand-grad': 'linear-gradient(135deg, var(--brand-primary), var(--brand-highlight), var(--brand-deep))',
       },
       fontFamily: {
         tech: ['var(--font-space-grotesk)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
@@ -32,9 +33,9 @@ const config: Config = {
         soft: '0 1px 3px rgba(11,15,25,0.06), 0 8px 24px rgba(11,15,25,0.06)',
         lift: '0 4px 12px rgba(11,15,25,0.08), 0 16px 40px rgba(11,15,25,0.12)',
         'brand-glow':
-          '0 0 24px rgba(139,92,246,0.35), 0 0 60px rgba(14,165,233,0.2)',
+          '0 0 24px rgba(84,186,185,0.35), 0 0 60px rgba(13,115,119,0.25)',
         'card-hover':
-          '0 6px 16px rgba(139,92,246,0.12), 0 16px 48px rgba(11,15,25,0.12), 0 0 0 1px rgba(139,92,246,0.35)',
+          '0 6px 16px rgba(84,186,185,0.16), 0 16px 48px rgba(41,37,34,0.14), 0 0 0 1px rgba(84,186,185,0.35)',
       },
       keyframes: {
         'float-y': {
@@ -46,8 +47,8 @@ const config: Config = {
           '50%': { backgroundPosition: '100% 50%' },
         },
         'pulse-ring': {
-          '0%': { boxShadow: '0 0 0 0 rgba(139,92,246,0.45)' },
-          '100%': { boxShadow: '0 0 0 20px rgba(139,92,246,0)' },
+          '0%': { boxShadow: '0 0 0 0 rgba(84,186,185,0.45)' },
+          '100%': { boxShadow: '0 0 0 20px rgba(84,186,185,0)' },
         },
         shimmer: {
           '0%': { backgroundPosition: '-200% 0' },

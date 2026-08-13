@@ -3,28 +3,37 @@
 @tailwind utilities;
 
 :root {
-  --canvas: #f6f7fb;
-  --surface: #ffffff;
-  --ink: #0b0f19;
-  --muted: #64748b;
-  --brand-cyan: #0ea5e9;
-  --brand-violet: #8b5cf6;
-  --brand-fuchsia: #d946ef;
+  --canvas: #FBF8F1;
+  --surface: #F7ECDE;
+  --ink: #292522;
+  --muted: #766b61;
+  --brand-primary: #54BAB9;
+  --brand-deep: #176b6a;
+  --brand-support: #E9DAC1;
+  --brand-highlight: #54BAB9;
 }
 
 .dark {
-  --canvas: #0b0f19;
-  --surface: #111827;
-  --ink: #e5e7eb;
-  --muted: #94a3b8;
+  --canvas: #212121;
+  --surface: #323232;
+  --ink: #F3FAF8;
+  --muted: #A9C3C1;
+  --brand-primary: #14FFEC;
+  --brand-deep: #0D7377;
+  --brand-support: #0D7377;
+  --brand-highlight: #14FFEC;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
-    --canvas: #0b0f19;
-    --surface: #111827;
-    --ink: #e5e7eb;
-    --muted: #94a3b8;
+    --canvas: #212121;
+    --surface: #323232;
+    --ink: #F3FAF8;
+    --muted: #A9C3C1;
+    --brand-primary: #14FFEC;
+    --brand-deep: #0D7377;
+    --brand-support: #0D7377;
+    --brand-highlight: #14FFEC;
   }
 }
 
@@ -43,7 +52,7 @@ body {
 }
 
 ::selection {
-  background: rgba(139, 92, 246, 0.2);
+  background: rgba(84, 186, 185, 0.28);
   color: inherit;
 }
 
@@ -63,11 +72,11 @@ body {
   :root:not(.light) .custom-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.08); }
 }
 .custom-scroll::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(14, 165, 233, 0.5), rgba(139, 92, 246, 0.5));
+  background: linear-gradient(180deg, rgba(84, 186, 185, 0.6), rgba(13, 115, 119, 0.6));
   border-radius: 999px;
 }
 .custom-scroll::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(14, 165, 233, 0.8), rgba(139, 92, 246, 0.8));
+  background: linear-gradient(180deg, rgba(84, 186, 185, 0.9), rgba(13, 115, 119, 0.9));
 }
 
 /* ------------------------------------------------------------------------- *
@@ -95,14 +104,14 @@ body {
   height: 44vw;
   left: -12%;
   top: -18%;
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.45), transparent 70%);
+  background: radial-gradient(circle, rgba(84, 186, 185, 0.42), transparent 70%);
 }
 .aurora-blob-2 {
   width: 40vw;
   height: 40vw;
   right: -14%;
   top: 8%;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.45), transparent 70%);
+  background: radial-gradient(circle, rgba(13, 115, 119, 0.42), transparent 70%);
   animation-delay: -7s;
 }
 .aurora-blob-3 {
@@ -110,7 +119,7 @@ body {
   height: 46vw;
   left: 22%;
   bottom: -22%;
-  background: radial-gradient(circle, rgba(217, 70, 239, 0.35), transparent 70%);
+  background: radial-gradient(circle, rgba(233, 218, 193, 0.38), transparent 70%);
   animation-delay: -13s;
 }
 
@@ -163,7 +172,7 @@ body {
 .tilt-card:hover {
   transform: translateZ(16px) rotateX(2deg) rotateY(-2deg);
   box-shadow:
-    0 6px 16px rgba(139, 92, 246, 0.12),
+    0 6px 16px rgba(84, 186, 185, 0.16),
     0 16px 48px rgba(11, 15, 25, 0.1);
 }
 
@@ -185,12 +194,12 @@ body {
 }
 .hover-lift:hover {
   transform: translateY(-3px);
-  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.1), 0 16px 48px rgba(11, 15, 25, 0.1);
+  box-shadow: 0 6px 16px rgba(84, 186, 185, 0.14), 0 16px 48px rgba(41, 37, 34, 0.14);
 }
 
 /* Gradient text */
 .gradient-text {
-  background: linear-gradient(120deg, #0ea5e9, #8b5cf6 50%, #d946ef);
+  background: linear-gradient(120deg, var(--brand-primary), var(--brand-highlight) 50%, var(--brand-deep));
   background-size: 150% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -230,7 +239,7 @@ body {
   background: linear-gradient(
     100deg,
     transparent 20%,
-    rgba(139, 92, 246, 0.12) 50%,
+    rgba(84, 186, 185, 0.14) 50%,
     transparent 80%
   );
   background-size: 200% 100%;
@@ -244,7 +253,7 @@ body {
   -webkit-backdrop-filter: blur(14px);
 }
 
-.dark .glass { background: rgba(17, 24, 39, 0.72); }
+.dark .glass { background: rgba(50, 50, 50, 0.82); }
 @media (prefers-color-scheme: dark) {
-  :root:not(.light) .glass { background: rgba(17, 24, 39, 0.72); }
+  :root:not(.light) .glass { background: rgba(50, 50, 50, 0.82); }
 }
