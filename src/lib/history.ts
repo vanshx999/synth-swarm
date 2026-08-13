@@ -1,4 +1,5 @@
 import type { SwarmEvent, Report } from '@/lib/types';
+import { cleanTopic } from '@/lib/topic';
 
 export interface ChatHistoryEntry {
   id: string;
@@ -7,6 +8,9 @@ export interface ChatHistoryEntry {
   createdAt: number;
   events: SwarmEvent[];
   report: Report | null;
+  questions: string[];
+  questionCount: number;
+  mergeIfSameTopic(newTopic: string): boolean;
   error?: string;
 }
 
@@ -19,11 +23,39 @@ export function getHistory(): ChatHistoryEntry[] {
   try {
     const raw = window.localStorage.getItem(HISTORY_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as ChatHistoryEntry[];
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed = JSON.parse(raw) as Partial<ChatHistoryEntry>[];
+    return Array.isArray(parsed) ? parsed.map(normalizeEntry) : [];
   } catch {
     return [];
   }
+}
+
+function normalizeEntry(entry: Partial<ChatHistoryEntry>): ChatHistoryEntry {
+  const topic = typeof entry.topic === 'string' ? entry.topic : '';
+  const questions = Array.isArray(entry.questions) && entry.questions.length > 0
+    ? entry.questions.filter((q): q is string => typeof q === 'string')
+    : [topic];
+  const questionCount = typeof entry.questionCount === 'number'
+    ? entry.questionCount
+    : questions.length;
+
+  return {
+    ...(entry as ChatHistoryEntry),
+    topic,
+    questions,
+    questionCount: Math.max(questionCount, questions.length),
+    mergeIfSameTopic(newTopic: string) { return topicsShareWords(topic, newTopic); },
+  };
+}
+
+export function topicsShareWords(topic: string, newTopic: string): boolean {
+  const existingWords = new Set(cleanTopic(topic).toLowerCase().split(/\s+/).filter(Boolean));
+  const newWords = new Set(cleanTopic(newTopic).toLowerCase().split(/\s+/).filter(Boolean));
+  let overlap = 0;
+  for (const word of newWords) {
+    if (existingWords.has(word)) overlap += 1;
+  }
+  return overlap >= 2;
 }
 
 /**
