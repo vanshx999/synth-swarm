@@ -48,7 +48,7 @@ async function searchTavily(query: string): Promise<Source[]> {
       query,
       api_key: apiKey,
       search_depth: searchDepth(query),
-      max_results: 5,
+      max_results: 3,
     };
     const days = searchRecencyDays(query);
     if (days) body.days = days;
@@ -109,7 +109,7 @@ function freshnessDirective(): string {
 function sourcesToContext(sources: Source[]): string {
   return sources
     .map((s, i) => {
-      const snippet = s.snippet.length > 500 ? `${s.snippet.slice(0, 500)}…` : s.snippet;
+      const snippet = s.snippet.length > 200 ? `${s.snippet.slice(0, 200)}…` : s.snippet;
       return `[${i + 1}] ${s.title}\nURL: ${s.url}\nSnippet: ${snippet}`;
     })
     .join('\n\n');
@@ -168,7 +168,7 @@ export class GroqProvider implements LLMProvider {
         researcher: 'Provide a concise research brief with concrete facts, dates, names, and figures supported by the search results. Avoid generic advice and cite the sources.',
         synthesizer: 'Synthesize the supplied research into concise valid JSON with title, summary, sections [{title, content}], and gaps {missing, reasoning}. Use only topic-specific gaps; use an empty missing array when complete. Output JSON only.',
       },
-      researcherMaxTokens: 800,
+      researcherMaxTokens: 500,
       synthesizerMaxTokens: 700,
       plannerMaxTokens: 900,
     },
@@ -284,7 +284,7 @@ export class GroqProvider implements LLMProvider {
             temperature: 0.3,
             max_tokens: modelConfig.synthesizerMaxTokens,
           }),
-        }, synthModel === this.researchModel ? 3 : 2);
+        }, 6);
 
         if (response.ok) {
           const data = await response.json();

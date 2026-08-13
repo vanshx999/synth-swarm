@@ -15,8 +15,8 @@ export interface ChatHistoryEntry {
   running?: boolean;
 }
 
-// v3: bumped to clear prior chat history for a clean demo slate.
-const HISTORY_KEY = 'synth_history_v3';
+// v4: bumped to clear prior chat history for a clean demo slate.
+const HISTORY_KEY = 'synth_history_v4';
 const SESSION_KEY = 'synth_session';
 const MAX_ENTRIES = 30;
 

@@ -49,7 +49,7 @@ function extractJson(text: string): string | null {
 export class SwarmEngine {
   private provider: LLMProvider;
   private onEvent: SwarmEventCallback;
-  private maxLoops = 2;
+  private maxLoops = 1;
 
   constructor(provider: LLMProvider, onEvent: SwarmEventCallback) {
     this.provider = provider;
@@ -95,7 +95,7 @@ export class SwarmEngine {
    */
   async swarmRunner(tasks: Task[]): Promise<void> {
     // Drive parallel searches per run while keeping Groq request bursts bounded.
-    const maxConcurrent = Math.min(4, tasks.length);
+    const maxConcurrent = Math.min(2, tasks.length);
     let cursor = 0;
     const worker = async () => {
       while (cursor < tasks.length) {
@@ -144,7 +144,7 @@ const body =
       .filter((t) => t.status === 'done' && t.result)
       .map((t) => {
         const result = t.result!.replace(/\s+/g, ' ').trim();
-        return `## ${t.title}\n${result.slice(0, 1500)}${result.length > 1500 ? '…' : ''}`;
+        return `## ${t.title}\n${result.slice(0, 700)}${result.length > 700 ? '…' : ''}`;
       })
       .join('\n\n---\n\n') || 'No completed research results were provided.';
 
