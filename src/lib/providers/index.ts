@@ -142,10 +142,13 @@ export class GroqProvider implements LLMProvider {
   // Final synthesis stays on the high-quality model; per-task research drafts
   // run on a faster model so a multi-task swarm fits the demo window.
   private model = 'llama-3.3-70b-versatile';
-  private researchModel = 'qwen/qwen3.6-27b';
-  // Premium synthesis chain: try each in order so a model whose daily token
-  // quota is exhausted (common at demos) fails fast and the next takes over.
-  private synthesisModels = ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b'];
+  // Fast, non-reasoning research model so a burst of parallel agents never
+  // blows through Groq's tokens-per-minute limit (reasoning models emit huge
+  // chain-of-thought that triggers 429s when 4+ run at once).
+  private researchModel = 'llama-3.1-8b-instant';
+  // Synthesis chain: the flagship model is reliable and non-reasoning, so a
+  // single entry is enough.
+  private synthesisModels = ['llama-3.3-70b-versatile'];
   private exaApiKey: string;
   private searchProvider: SearchProvider;
   private modelPrompts: Record<string, { prompts: Record<string, string>; researcherMaxTokens: number; synthesizerMaxTokens: number; plannerMaxTokens: number }> = {
@@ -201,8 +204,9 @@ export class GroqProvider implements LLMProvider {
     return this.apiKey.length > 0;
   }
 
-  /** Retry transient Groq failures (429 / 5xx), honoring Retry-After on 429. */
-  private async fetchRetry(init: RequestInit, maxAttempts = 12): Promise<Response> {
+  /** Retry transient Groq failures (429 / 5xx) with a SHORT backoff so a
+   *  rate-limited demo fails fast into the source fallback instead of hanging. */
+  private async fetchRetry(init: RequestInit, maxAttempts = 3): Promise<Response> {
     const MAX_ATTEMPTS = maxAttempts;
     let attempt = 0;
     for (;;) {
@@ -215,17 +219,15 @@ export class GroqProvider implements LLMProvider {
       let delay: number;
       if (status === 429) {
         // A daily-token-exhaustion 429 will NOT clear within the run — don't
-        // burn minutes sleeping on it; the synthesis chain moves to the next
-        // model immediately instead.
+        // burn time sleeping on it.
         const bodyText = await response.clone().text();
         if (/tokens per day|tpd|daily limit|too many requests today/i.test(bodyText)) {
           return response;
         }
         const retryAfter = Number(response.headers.get('retry-after'));
-        // Retry-After is in seconds; cap so the run still progresses.
-        delay = retryAfter > 0 ? Math.min(retryAfter, 15) * 1000 : 1000 * attempt;
+        delay = retryAfter > 0 ? Math.min(retryAfter, 3) * 1000 : 600 * attempt;
       } else {
-        delay = Math.pow(1.9, attempt) * 1000 + Math.random() * 500;
+        delay = Math.min(Math.pow(1.7, attempt) * 1000, 4000);
       }
       await new Promise<void>((r) => setTimeout(r, delay));
     }
