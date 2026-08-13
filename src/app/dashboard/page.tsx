@@ -202,7 +202,7 @@ export default function DashboardPage() {
       >
         {/* Brand */}
         <div className="flex items-center gap-2 px-5 py-5 border-b border-black/5 dark:border-white/10">
-          <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-primary via-brand-highlight to-brand-deep flex items-center justify-center text-white font-bold shadow-brand-glow">
+          <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-primary via-brand-highlight to-brand-deep flex items-center justify-center text-[#053B36] font-bold shadow-brand-glow">
             S
           </span>
           <div className="flex-1 min-w-0">
@@ -231,7 +231,7 @@ export default function DashboardPage() {
               setMode('chat');
               setSidebarOpen(false);
             }}
-            className="w-full flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep text-white py-2.5 px-3 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98] shadow-brand-glow"
+            className="w-full flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep text-[#053B36] py-2.5 px-3 text-sm font-semibold btn-3d shadow-brand-glow"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
               <line x1="12" y1="5" x2="12" y2="19" />
@@ -311,7 +311,7 @@ export default function DashboardPage() {
 
         {/* User */}
         <div className="px-4 py-4 border-t border-black/5 dark:border-white/10 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-primary to-brand-deep flex items-center justify-center text-white font-bold text-sm">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-primary to-brand-deep flex items-center justify-center text-[#053B36] font-bold text-sm">
             {(session?.name || 'B')[0].toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">

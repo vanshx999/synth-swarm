@@ -9,9 +9,9 @@ interface KanbanViewProps {
 
 const COLUMNS = [
   { key: 'pending', label: 'Queued', accent: 'text-muted', dot: 'bg-slate-400', ring: 'border-slate-300 dark:border-slate-600' },
-  { key: 'working', label: 'In Progress', accent: 'text-brand-deep', dot: 'bg-brand-primary', ring: 'border-brand-primary' },
-  { key: 'done', label: 'Complete', accent: 'text-emerald-600', dot: 'bg-emerald-500', ring: 'border-emerald-400' },
-  { key: 'failed', label: 'Failed', accent: 'text-rose-600', dot: 'bg-rose-500', ring: 'border-rose-400' },
+  { key: 'working', label: 'In Progress', accent: 'text-brand-deep dark:text-brand-highlight', dot: 'bg-brand-primary', ring: 'border-brand-primary' },
+  { key: 'done', label: 'Complete', accent: 'text-emerald-600 dark:text-emerald-300', dot: 'bg-emerald-500', ring: 'border-emerald-400' },
+  { key: 'failed', label: 'Failed', accent: 'text-rose-600 dark:text-rose-300', dot: 'bg-rose-500', ring: 'border-rose-400' },
 ] as const;
 
 type StatusKey = (typeof COLUMNS)[number]['key'];
@@ -28,12 +28,12 @@ const CARD_STYLES: Record<
   },
   done: {
     border: 'border-emerald-300 dark:border-emerald-500/60',
-    head: 'text-emerald-700',
+    head: 'text-emerald-700 dark:text-emerald-300',
     badge: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300',
   },
   failed: {
     border: 'border-rose-300 dark:border-rose-500/60',
-    head: 'text-rose-700',
+    head: 'text-rose-700 dark:text-rose-300',
     badge: 'bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300',
   },
 };

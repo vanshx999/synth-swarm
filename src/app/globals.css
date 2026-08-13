@@ -14,13 +14,13 @@
 }
 
 .dark {
-  --canvas: #212121;
-  --surface: #323232;
-  --ink: #F3FAF8;
-  --muted: #A9C3C1;
+  --canvas: #070C14;
+  --surface: #121B26;
+  --ink: #EAF4F2;
+  --muted: #A6BEBB;
   --brand-primary: #14FFEC;
-  --brand-deep: #0D7377;
-  --brand-support: #0D7377;
+  --brand-deep: #0E8C86;
+  --brand-support: #0B2E33;
   --brand-highlight: #14FFEC;
 }
 
@@ -49,6 +49,24 @@ body {
   background: var(--canvas);
   color: var(--ink);
   overflow-x: hidden;
+}
+
+.dark body {
+  background:
+    radial-gradient(1100px 520px at 75% -8%, rgba(20, 255, 236, 0.07), transparent 60%),
+    radial-gradient(800px 480px at 12% 108%, rgba(14, 140, 134, 0.14), transparent 60%),
+    var(--canvas);
+  background-attachment: fixed;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) body {
+    background:
+      radial-gradient(1100px 520px at 75% -8%, rgba(20, 255, 236, 0.07), transparent 60%),
+      radial-gradient(800px 480px at 12% 108%, rgba(14, 140, 134, 0.14), transparent 60%),
+      var(--canvas);
+    background-attachment: fixed;
+  }
 }
 
 ::selection {
@@ -139,9 +157,9 @@ body {
   :root:not(.light) .dots-overlay { background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px); }
 }
 
-.dark .aurora-blob { opacity: 0.22; }
+.dark .aurora-blob { opacity: 0.3; }
 @media (prefers-color-scheme: dark) {
-  :root:not(.light) .aurora-blob { opacity: 0.22; }
+  :root:not(.light) .aurora-blob { opacity: 0.3; }
 }
 
 @keyframes aurora-drift {
@@ -253,7 +271,70 @@ body {
   -webkit-backdrop-filter: blur(14px);
 }
 
-.dark .glass { background: rgba(50, 50, 50, 0.82); }
+.dark .glass {
+  background: rgba(18, 27, 38, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
 @media (prefers-color-scheme: dark) {
-  :root:not(.light) .glass { background: rgba(50, 50, 50, 0.82); }
+  :root:not(.light) .glass {
+    background: rgba(18, 27, 38, 0.82);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+}
+
+/* ------------------------------------------------------------------------- *
+ * 3D button hover — global lift/press for every button; class transforms win
+ * ------------------------------------------------------------------------- */
+
+:where(button) {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease,
+    filter 0.2s ease, background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+:where(button):not(:disabled):hover {
+  transform: perspective(700px) translateY(-2px);
+  filter: brightness(1.05);
+}
+
+:where(button):not(:disabled):active {
+  transform: perspective(700px) translateY(0) scale(0.96);
+}
+
+/* Premium 3D tilt for primary call-to-action buttons */
+.btn-3d {
+  transform-style: preserve-3d;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s ease;
+}
+.btn-3d:hover {
+  transform: perspective(620px) rotateX(4deg) rotateY(-4deg) translateY(-2px);
+  box-shadow: 0 12px 32px rgba(20, 255, 236, 0.18), 0 4px 14px rgba(0, 0, 0, 0.28);
+}
+.btn-3d:active {
+  transform: perspective(620px) rotateX(0deg) rotateY(0deg) translateY(0) scale(0.98);
+}
+
+/* Animated gradient border for the mission-control swarm panel */
+.glow-card {
+  position: relative;
+}
+.glow-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    140deg,
+    rgba(20, 255, 236, 0.5),
+    transparent 30%,
+    transparent 70%,
+    rgba(14, 140, 134, 0.45)
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }

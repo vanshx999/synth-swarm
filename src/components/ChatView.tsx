@@ -374,7 +374,7 @@ export function ChatView({
               <div className="max-w-[92%]">
                 {/* 3D avatar */}
                 <div className="flex items-center gap-2 mb-1.5">
-                  <span className="w-6 h-6 rounded-full bg-gradient-to-r from-brand-primary to-brand-deep flex items-center justify-center text-white text-[10px] font-mono font-bold">
+                  <span className="w-6 h-6 rounded-full bg-gradient-to-r from-brand-primary to-brand-deep flex items-center justify-center text-[#053B36] text-[10px] font-mono font-bold">
                     S
                   </span>
                   <span className="text-xs font-medium text-muted">Synth</span>
@@ -388,7 +388,7 @@ export function ChatView({
             <div key={m.id} className="flex justify-start">
               <div className="max-w-[92%]">
                 <div className="flex items-center gap-2 mb-1.5">
-                  <span className="w-6 h-6 rounded-full bg-gradient-to-r from-brand-primary to-brand-deep flex items-center justify-center text-white text-[10px] font-mono font-bold">
+                  <span className="w-6 h-6 rounded-full bg-gradient-to-r from-brand-primary to-brand-deep flex items-center justify-center text-[#053B36] text-[10px] font-mono font-bold">
                     S
                   </span>
                   <span className="text-xs font-medium text-muted">Synth</span>
@@ -412,7 +412,7 @@ export function ChatView({
           <div className="flex justify-start">
             <div className="w-full max-w-[92%]">
               <div className="flex items-center gap-2 mb-1.5">
-                <span className="w-6 h-6 rounded-full bg-gradient-to-r from-brand-primary to-brand-deep flex items-center justify-center text-white text-[10px] font-mono font-bold animate-pulse">
+                <span className="w-6 h-6 rounded-full bg-gradient-to-r from-brand-primary to-brand-deep flex items-center justify-center text-[#053B36] text-[10px] font-mono font-bold animate-pulse">
                   S
                 </span>
                 <span className="text-xs font-medium text-muted">swarm in flight</span>
@@ -445,7 +445,7 @@ export function ChatView({
             <button
               type="submit"
               disabled={!input.trim()}
-              className="disabled:opacity-40 px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep text-white text-sm font-semibold transition-transform hover:scale-[1.03] active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
+              className="disabled:opacity-40 px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep text-[#053B36] text-sm font-semibold btn-3d focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
             >
               {running ? 'Running…' : 'Send ⚡'}
             </button>
@@ -499,7 +499,7 @@ function SingleSwarmPanel({ run, compact = false }: { run: RunModel; compact?: b
   const active = run.tasks.length > 0;
 
   return (
-    <div className="rounded-2xl border border-black/8 dark:border-white/10 bg-surface/60 backdrop-blur overflow-hidden">
+    <div className="rounded-2xl border border-black/8 dark:border-white/10 bg-surface/60 backdrop-blur overflow-hidden glow-card">
       {/* mission control header */}
       <div className="flex items-center justify-between px-5 pt-4">
         <div className="flex items-center gap-2">
@@ -513,8 +513,8 @@ function SingleSwarmPanel({ run, compact = false }: { run: RunModel; compact?: b
         </div>
         <div className="flex items-center gap-3 font-mono text-[10px]">
           <span className="text-brand-deep dark:text-brand-highlight">ACTIVE {counts.working}</span>
-          <span className="text-emerald-600">DONE {counts.done}</span>
-          <span className="text-rose-600">FAIL {counts.failed}</span>
+          <span className="text-emerald-600 dark:text-emerald-300">DONE {counts.done}</span>
+          <span className="text-rose-600 dark:text-rose-300">FAIL {counts.failed}</span>
         </div>
       </div>
 
@@ -613,7 +613,7 @@ function MiniReport({ task, index }: { task: RunModel['tasks'][number]; index: n
     >
       <div className="flex items-center gap-1.5">
         <span
-          className={`w-4 h-4 rounded-full ${p.step} text-white text-[9px] flex items-center justify-center font-bold`}
+          className={`w-4 h-4 rounded-full ${p.step} text-[#053B36] text-[9px] flex items-center justify-center font-bold`}
         >
           {status}
         </span>
@@ -643,7 +643,7 @@ function ReportBody({ run }: { run: RunModel }) {
 
   const stat = (label: string) => (
     <div className="flex items-center gap-1.5">
-      <span className="w-4 h-4 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center text-[10px] font-bold">✓</span>
+      <span className="w-4 h-4 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 flex items-center justify-center text-[10px] font-bold">✓</span>
       <span className="text-xs text-muted">{label}</span>
     </div>
   );
@@ -720,11 +720,11 @@ function ReportBody({ run }: { run: RunModel }) {
 
       {run.gaps.length > 0 && (
         <div className="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 p-3">
-          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-amber-700 mb-1">
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-amber-700 dark:text-amber-300 mb-1">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             Loop {run.gaps.length} — gaps detected
           </div>
-          <p className="text-xs text-amber-800 whitespace-pre-wrap">
+          <p className="text-xs text-amber-800 dark:text-amber-200 whitespace-pre-wrap">
             {run.gaps[run.gaps.length - 1].reasoning}
           </p>
         </div>

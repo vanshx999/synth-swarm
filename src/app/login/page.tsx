@@ -124,9 +124,9 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={!email.trim()}
-              className="group relative w-full rounded-xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep p-px disabled:opacity-40 disabled:cursor-not-allowed transition-transform hover:scale-[1.01] active:scale-[0.99]"
+              className="group relative w-full rounded-xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep p-px disabled:opacity-40 disabled:cursor-not-allowed btn-3d"
             >
-              <span className="flex items-center justify-center gap-2 px-6 py-3 rounded-[11px] bg-surface/90 font-semibold text-sm text-ink transition-colors group-hover:bg-transparent group-hover:text-white">
+              <span className="flex items-center justify-center gap-2 px-6 py-3 rounded-[11px] bg-surface/90 font-semibold text-sm text-ink transition-colors group-hover:bg-transparent group-hover:text-[#053B36]">
                 Launch Console →
               </span>
             </button>
