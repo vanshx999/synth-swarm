@@ -29,9 +29,12 @@ interface ChatViewProps {
   loadedRun?: RunModel | null;
   loadedKey?: string;
   loadedQuestions?: string[];
-  sessionToken?: number;
-  onSaveRun: (run: RunModel, topic: string, events: SwarmEvent[]) => void;
-  onActiveRunChange: (run: RunModel | null) => void;
+  /** The sidebar entry this view belongs to (undefined for the composer).
+      Follow-up questions launched here update this same entry. */
+  entryId?: string;
+  onSaveRun: (run: RunModel, topic: string, events: SwarmEvent[], entryId?: string) => void;
+  onRunStart: (run: RunModel, topic: string, entryId?: string) => void;
+  onRunProgress: (run: RunModel, topic: string, events: SwarmEvent[], entryId?: string) => void;
   searchProvider: SearchProvider;
 }
 
@@ -39,9 +42,10 @@ export function ChatView({
   loadedRun,
   loadedKey,
   loadedQuestions,
-  sessionToken = 0,
+  entryId,
   onSaveRun,
-  onActiveRunChange,
+  onRunStart,
+  onRunProgress,
   searchProvider,
 }: ChatViewProps) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -53,6 +57,7 @@ export function ChatView({
   const scrollRef = useRef<HTMLDivElement>(null);
   const eventsRef = useRef<Map<string, SwarmEvent[]>>(new Map());
   const activeRunCount = useRef(0);
+  const lastProgressSave = useRef(0);
   // Original (dash-stripped) subject of the last run, so follow-ups like
   // "explain more" expand against the real topic instead of being searched
   // as their own subject.
@@ -72,9 +77,16 @@ export function ChatView({
     setRunning(false);
     activeRunCount.current = 0;
     eventsRef.current = new Map();
+    lastProgressSave.current = 0;
     followUpBaseRef.current = null;
     setMetrics({ researcher: 0, synthesis: 0, loops: 0 });
-  }, [sessionToken]);
+  }, []);
+
+  // Anchor follow-ups ("explain more", …) to the loaded chat's topic.
+  useEffect(() => {
+    if (loadedRun?.topic) followUpBaseRef.current = followUpBase(loadedRun.topic);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedRun?.topic]);
 
   // When a run from history is loaded externally, show it as a report message
   useEffect(() => {
@@ -112,8 +124,11 @@ export function ChatView({
       (userMsg ? [userMsg] : []).concat(questionsMsg ? [questionsMsg] : [], reportMsg)
     );
     setCurrentRun(loadedRun);
+    // Only react to a different chat being loaded (the viewer remounts per
+    // selection). Deliberately ignore loadedRun/loadedQuestions changes so a
+    // follow-up run streaming in this same view is never wiped.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadedKey, loadedQuestions]);
+  }, [loadedKey]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -134,7 +149,13 @@ export function ChatView({
       return next;
     });
     setCurrentRun(updated);
-    onActiveRunChange(updated);
+    // Throttled live persistence so the sidebar entry survives a page reload
+    // even while the run is still in flight.
+    const now = Date.now();
+    if (now - lastProgressSave.current > 2000) {
+      lastProgressSave.current = now;
+      onRunProgress(updated, updated.topic ?? '', eventsRef.current.get(runId) ?? [], entryId);
+    }
     return updated;
   };
 
@@ -198,8 +219,10 @@ export function ChatView({
     eventsRef.current.set(sessionId, []);
     setActiveRuns((prev) => new Map(prev).set(sessionId, run));
     setCurrentRun(run);
-    onActiveRunChange(run);
     setRunning(true);
+    // Register the chat in the sidebar the moment search is pressed, not after
+    // the report finishes — so long runs are never "lost".
+    onRunStart(run, text, entryId);
 
     try {
       const res = await fetch('/api/swarm', {
@@ -293,8 +316,7 @@ export function ChatView({
         )
       );
 
-      onSaveRun(final, text, eventsRef.current.get(sessionId) ?? []);
-      onActiveRunChange(final);
+      onSaveRun(final, text, eventsRef.current.get(sessionId) ?? [], entryId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'swarm failed unexpectedly';
       setMessages((prev) =>
@@ -303,8 +325,7 @@ export function ChatView({
       const failed: RunModel = { ...run, topic: text, running: false, error: msg };
       setCurrentRun(failed);
       // Persist failed/interrupted runs too so they don't silently vanish.
-      onSaveRun(failed, text, eventsRef.current.get(sessionId) ?? []);
-      onActiveRunChange(failed);
+      onSaveRun(failed, text, eventsRef.current.get(sessionId) ?? [], entryId);
     } finally {
       activeRunCount.current = Math.max(0, activeRunCount.current - 1);
       setRunning(activeRunCount.current > 0);

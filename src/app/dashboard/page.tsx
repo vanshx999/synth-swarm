@@ -1,9 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { SearchProvider, SwarmEvent } from '@/lib/types';
-import { getSession, getHistory, saveRun, logout, deleteRun, trimEventsForStorage, topicsShareWords, type ChatHistoryEntry } from '@/lib/history';
+import { getSession, getHistory, saveRun, saveRunAll, logout, trimEventsForStorage, topicsShareWords, type ChatHistoryEntry } from '@/lib/history';
 import type { RunModel } from '@/lib/runModel';
 import { applyEvent, emptyRun } from '@/lib/runModel';
 import { ChatView } from '@/components/ChatView';
@@ -18,19 +18,12 @@ export default function DashboardPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [mode, setMode] = useState<ViewMode>('chat');
   const [history, setHistory] = useState<ChatHistoryEntry[]>([]);
-  const [activeRun, setActiveRun] = useState<RunModel | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // Bumped on "New research" to reset the persistent chat view.
-  const [sessionToken, setSessionToken] = useState(0);
+  // Bumped to give the composer a fresh identity after a run finalizes, so the
+  // next question starts in a clean box instead of stacking on the old report.
+  const [composerKey, setComposerKey] = useState(0);
   const [searchProvider, setSearchProvider] = useState<SearchProvider>('tavily');
-  const highContrastRef = useRef(false);
-  const [highContrast, setHighContrast] = useState(false);
-
-  const toggleHighContrast = () => {
-    highContrastRef.current = !highContrastRef.current;
-    setHighContrast(highContrastRef.current);
-  };
 
   useEffect(() => {
     const session = getSession();
@@ -42,62 +35,130 @@ export default function DashboardPage() {
     setHistory(getHistory());
   }, [router]);
 
-  const handleSaveRun = useCallback((run: RunModel, topic: string, events: SwarmEvent[]) => {
-    const entry: ChatHistoryEntry = {
-      id: run.startedAt ? `run-${run.startedAt}` : `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      topic,
-      provider: 'groq',
-      createdAt: run.startedAt || Date.now(),
-      events: trimEventsForStorage(events),
-      report: run.report,
-      questions: [topic.trim()],
-      questionCount: 1,
-      mergeIfSameTopic(newTopic: string) { return topicsShareWords(topic, newTopic); },
-      error: run.error,
-    };
-
-    const existing = getHistory().slice(0, 10).find((h) => h.mergeIfSameTopic(topic));
-    if (existing) {
-      const merged: ChatHistoryEntry = {
-        ...existing,
-        questions: [...existing.questions, topic.trim()],
-        questionCount: existing.questionCount + 1,
-      };
-      setHistory((prev) => prev.map((h) => (h.id === merged.id ? merged : h)));
-      saveRun(merged);
-      setSelectedId(merged.id);
-      return;
-    }
-
-    setHistory((prev) => {
-      const next = [entry, ...prev.filter((h) => h.id !== entry.id)].slice(0, 30);
-      return next;
-    });
-    saveRun(entry);
-    setSelectedId(entry.id);
-  }, []);
-
-  const handleActiveRunChange = useCallback((run: RunModel | null) => {
-    setActiveRun(run);
-    if (run) setSelectedId(null);
-  }, []);
-
-  const loadRun = (entry: ChatHistoryEntry) => {
-    setSelectedId(entry.id);
-    setMode('chat');
-    setActiveRun(null);
-    // Rebuild a run model from saved events so kanban can show the finished board
+  const buildRun = (entry: ChatHistoryEntry): RunModel => {
     let m: RunModel = {
       ...emptyRun(),
       topic: entry.topic,
       report: entry.report,
       error: entry.error,
       startedAt: entry.createdAt,
+      running: entry.running ?? false,
     };
     for (const evt of entry.events) {
       m = applyEvent(m, evt, entry.createdAt);
     }
-    setActiveRun(m);
+    if (entry.running) m.running = true;
+    return m;
+  };
+
+  // Register the chat in the sidebar the instant search is pressed. A new
+  // search (no entryId) creates a fresh entry; a follow-up (entryId set)
+  // appends to its existing chat so it never spawns a separate tab.
+  const handleRunStart = useCallback((run: RunModel, topic: string, entryId?: string) => {
+    if (entryId) {
+      setHistory((prev) => {
+        const idx = prev.findIndex((h) => h.id === entryId);
+        if (idx < 0) return prev;
+        const existing = prev[idx];
+        const updated: ChatHistoryEntry = {
+          ...existing,
+          running: true,
+          questions: existing.questions.includes(topic.trim())
+            ? existing.questions
+            : [...existing.questions, topic.trim()],
+          questionCount: existing.questionCount + 1,
+        };
+        const next = [...prev];
+        next[idx] = updated;
+        saveRun(updated);
+        return next;
+      });
+      return;
+    }
+    const entry: ChatHistoryEntry = {
+      id: run.startedAt ? `run-${run.startedAt}` : `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      topic,
+      provider: 'groq',
+      createdAt: run.startedAt || Date.now(),
+      events: [],
+      report: null,
+      questions: [topic.trim()],
+      questionCount: 1,
+      running: true,
+      mergeIfSameTopic(newTopic: string) { return topicsShareWords(topic, newTopic); },
+    };
+    setHistory((prev) => [entry, ...prev.filter((h) => h.id !== entry.id)].slice(0, 30));
+    saveRun(entry);
+  }, []);
+
+  // Throttled live updates to the running entry so a mid-run page reload
+  // still shows the chat instead of losing it.
+  const handleRunProgress = useCallback((run: RunModel, _topic: string, events: SwarmEvent[], entryId?: string) => {
+    const id = entryId ?? (run.startedAt ? `run-${run.startedAt}` : '');
+    if (!id) return;
+    setHistory((prev) => {
+      const idx = prev.findIndex((h) => h.id === id);
+      if (idx < 0) return prev;
+      const updated: ChatHistoryEntry = { ...prev[idx], events: trimEventsForStorage(events), running: true };
+      const next = [...prev];
+      next[idx] = updated;
+      saveRun(updated);
+      return next;
+    });
+  }, []);
+
+  // Finalize a finished run. A follow-up updates its own chat in place; a new
+  // search becomes its own entry, is selected, and the composer resets.
+  const handleSaveRun = useCallback((run: RunModel, topic: string, events: SwarmEvent[], entryId?: string) => {
+    const trimmed = topic.trim();
+    if (entryId) {
+      setHistory((prev) => {
+        const idx = prev.findIndex((h) => h.id === entryId);
+        if (idx < 0) return prev;
+        const existing = prev[idx];
+        const updated: ChatHistoryEntry = {
+          ...existing,
+          events: trimEventsForStorage(events),
+          report: run.report ?? existing.report,
+          error: run.error ?? existing.error,
+          running: false,
+          questions: existing.questions.includes(trimmed)
+            ? existing.questions
+            : [...existing.questions, trimmed],
+          questionCount: existing.questionCount + 1,
+        };
+        const next = [...prev];
+        next[idx] = updated;
+        saveRunAll(next);
+        return next;
+      });
+      setSelectedId(entryId);
+      return;
+    }
+    const id = run.startedAt ? `run-${run.startedAt}` : `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const fresh: ChatHistoryEntry = {
+      id,
+      topic,
+      provider: 'groq',
+      createdAt: run.startedAt || Date.now(),
+      events: trimEventsForStorage(events),
+      report: run.report,
+      questions: [trimmed],
+      questionCount: 1,
+      running: false,
+      mergeIfSameTopic(newTopic: string) { return topicsShareWords(topic, newTopic); },
+      error: run.error,
+    };
+    const next = [fresh, ...getHistory().filter((h) => h.id !== id)].slice(0, 30);
+    setHistory(next);
+    saveRunAll(next);
+    setSelectedId(id);
+    setComposerKey((k) => k + 1);
+  }, []);
+
+  const loadRun = (entry: ChatHistoryEntry) => {
+    setSelectedId(entry.id);
+    setMode('chat');
   };
 
   const confirmLogout = () => {
@@ -115,9 +176,13 @@ export default function DashboardPage() {
 
   const session = getSession();
   const selected = history.find((h) => h.id === selectedId) ?? null;
+  const selectedRun = selected ? buildRun(selected) : null;
+  // Kanban/Resources show the selected chat's board, falling back to the most
+  // recent run so they're never blank while a swarm is in flight.
+  const displayRun = selectedRun ?? (history.length > 0 ? buildRun(history[0]) : null);
 
   return (
-    <div className={`h-screen flex overflow-hidden relative bg-canvas${highContrast ? ' high-contrast' : ''}`}>
+    <div className="h-screen flex overflow-hidden relative bg-canvas">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 p-4">Skip to main content</a>
       {/* Backdrop handled by layout */}
 
@@ -163,10 +228,8 @@ export default function DashboardPage() {
           <button
             onClick={() => {
               setSelectedId(null);
-              setActiveRun(null);
               setMode('chat');
               setSidebarOpen(false);
-              setSessionToken((t) => t + 1);
             }}
             className="w-full flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep text-white py-2.5 px-3 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98] shadow-brand-glow"
           >
@@ -212,17 +275,12 @@ export default function DashboardPage() {
             >
               <div className='flex items-center gap-2'>
                 <span className='font-medium truncate text-ink'>{h.report?.title || h.topic}</span>
-                <span className='text-[10px] text-muted'>{h.questionCount} questions</span>
               </div>
-              <div className='mt-1 space-y-1'>
-                {h.questions.map((q, i) => (
-                  <details key={i} className='px-2 py-1 rounded-sm bg-surface/50'>
-                    <summary className='cursor-pointer text-[11px] text-muted truncate'>
-                      Q{i + 1}: {q.substring(0, 80)}{q.length > 80 ? '…' : ''}
-                    </summary>
-                  </details>
-                ))}
-              </div>
+              {h.running && (
+                <div className="mt-1 font-mono text-[10px] text-brand-deep dark:text-brand-highlight animate-pulse">
+                  ◌ Running…
+                </div>
+              )}
               <div className="flex items-center justify-between mt-1.5">
                 <span className="font-mono text-[9px] text-muted">
                   {new Date(h.createdAt).toLocaleString('en-US', {
@@ -236,7 +294,9 @@ export default function DashboardPage() {
                   <span className="font-mono text-[9px] uppercase px-1 rounded bg-surface/60 border border-black/5 dark:border-white/10 text-muted">
                     ⚡ groq
                   </span>
-                  {h.report ? (
+                  {h.running ? (
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" title="running" />
+                  ) : h.report ? (
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="report ready" />
                   ) : h.error ? (
                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
@@ -245,18 +305,6 @@ export default function DashboardPage() {
                   )}
                 </span>
               </div>
-              <button
-                type="button"
-                className="mt-2 text-[11px] font-medium text-brand-deep dark:text-brand-highlight hover:text-brand-primary"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setSelectedId(null);
-                  setActiveRun(null);
-                  setSessionToken((t) => t + 1);
-                }}
-              >
-                Start new topic
-              </button>
             </div>
           ))}
         </div>
@@ -335,37 +383,49 @@ export default function DashboardPage() {
             >
               Search: {searchProvider}
             </button>
-            <button
-              type="button"
-              onClick={toggleHighContrast}
-              aria-pressed={highContrast}
-              className="font-mono text-[9px] uppercase tracking-widest px-3 py-1 rounded-full border border-black/10 dark:border-white/10 text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
-            >
-              Contrast
-            </button>
             <ThemeToggle />
           </div>
         </header>
 
-        {/* Content — all views stay mounted so switching tabs never loses
-            the in-flight/current chat state; inactive views are hidden. */}
+        {/* Content — composer and the selected chat are separate, isolated
+            instances so an in-flight run never bleeds into another chat. */}
         <div className="flex-1 min-h-0 relative flex">
-          <div className={mode === 'chat' ? 'absolute inset-0 flex' : 'absolute inset-0 hidden'}>
+          {/* Composer: where new searches launch and stream (shown only in
+              chat mode with no history chat selected). */}
+          <div className={mode === 'chat' && selectedId === null ? 'absolute inset-0 flex' : 'absolute inset-0 hidden'}>
             <ChatView
-              loadedRun={selected ? activeRun : null}
-              loadedKey={selectedId ?? undefined}
-              loadedQuestions={selected?.questions}
-              sessionToken={sessionToken}
+              key={`composer-${composerKey}`}
+              loadedRun={null}
               onSaveRun={handleSaveRun}
-              onActiveRunChange={handleActiveRunChange}
+              onRunStart={handleRunStart}
+              onRunProgress={handleRunProgress}
               searchProvider={searchProvider}
             />
           </div>
+
+          {/* Selected chat: its own live view — follow-ups launched here stay
+              in this chat. */}
+          <div className={mode === 'chat' && selectedId !== null ? 'absolute inset-0 flex' : 'absolute inset-0 hidden'}>
+            {selected && selectedRun && (
+              <ChatView
+                key={`view-${selected.id}`}
+                entryId={selected.id}
+                loadedRun={selectedRun}
+                loadedKey={selected.id}
+                loadedQuestions={selected.questions}
+                onSaveRun={handleSaveRun}
+                onRunStart={handleRunStart}
+                onRunProgress={handleRunProgress}
+                searchProvider={searchProvider}
+              />
+            )}
+          </div>
+
           <div className={mode === 'kanban' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
-            <KanbanView run={activeRun} />
+            <KanbanView run={displayRun} />
           </div>
           <div className={mode === 'resources' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
-            <ResourcesView run={activeRun} />
+            <ResourcesView run={displayRun} />
           </div>
         </div>
       </main>

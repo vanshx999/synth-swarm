@@ -185,6 +185,21 @@ ${body}`;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown synthesis error';
       this.emit({ type: 'error', message });
+      // If the primary (premium) synthesis was throttled, re-synthesize on the
+      // fast research model so the demo still ships a real report instead of
+      // a raw-source fallback.
+      try {
+        const response = await this.provider.runAgent('synthesizer-fallback', prompt);
+        const json = extractJson(response);
+        if (json) {
+          const parsed = JSON.parse(json);
+          const reportRaw = parsed && typeof parsed === 'object' && parsed.report ? parsed.report : parsed;
+          report = this.normalizeReport(reportRaw, loopNum, topic);
+          gap = this.normalizeGap(parsed?.gap ?? parsed?.gaps);
+        }
+      } catch (fallbackError) {
+        // Keep the raw-source fallback report; the run still completes.
+      }
     }
 
     if (gap) {
@@ -228,16 +243,19 @@ ${body}`;
 
   private normalizeReport(value: unknown, loopNum: number, topic: string): Report {
     const obj = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
-    const title =
-      typeof obj.title === 'string' && obj.title.trim() ? obj.title.trim() : classifyTopic(topic).title;
-    const summary = typeof obj.summary === 'string' ? obj.summary : '';
     const raw = Array.isArray(obj.sections) ? obj.sections : [];
     const sections = raw
       .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object')
       .map((s) => ({
         title: typeof s.title === 'string' ? s.title : 'Section',
         content: typeof s.content === 'string' ? s.content : '',
-      }));
+      }))
+      .filter((s) => s.content.trim().length > 0);
+    // Never let a hallucinated/empty "report" replace real research.
+    if (sections.length === 0) throw new Error('Synthesis returned no usable sections');
+    const title =
+      typeof obj.title === 'string' && obj.title.trim() ? obj.title.trim() : classifyTopic(topic).title;
+    const summary = typeof obj.summary === 'string' && obj.summary.trim() ? obj.summary.trim() : sections[0].title;
     return { title, summary, sections, loopsUsed: loopNum };
   }
 

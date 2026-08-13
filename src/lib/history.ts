@@ -12,9 +12,12 @@ export interface ChatHistoryEntry {
   questionCount: number;
   mergeIfSameTopic(newTopic: string): boolean;
   error?: string;
+  running?: boolean;
 }
 
-const HISTORY_KEY = 'synth_history';
+// v2: bumped to wipe the pre-separation stored chats entirely. Each search is
+// now its own standalone entry; previous thread/continuation merging is gone.
+const HISTORY_KEY = 'synth_history_v2';
 const SESSION_KEY = 'synth_session';
 const MAX_ENTRIES = 30;
 
@@ -91,8 +94,15 @@ export function trimEventsForStorage(events: SwarmEvent[]): SwarmEvent[] {
 }
 
 export function saveRun(entry: ChatHistoryEntry): void {
-  const stored: ChatHistoryEntry = { ...entry, events: trimEventsForStorage(entry.events) };
-  const history = [stored, ...getHistory().filter((h) => h.id !== stored.id)].slice(0, MAX_ENTRIES);
+  saveRunAll([entry, ...getHistory().filter((h) => h.id !== entry.id)]);
+}
+
+/** Write an exact history array to storage with the same quota fallbacks. */
+export function saveRunAll(entries: ChatHistoryEntry[]): void {
+  const history = entries.map((e) => ({
+    ...e,
+    events: trimEventsForStorage(e.events),
+  }));
   try {
     window.localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
   } catch {
