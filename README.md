@@ -94,7 +94,7 @@ Dark mode makes the 3D swarm pop the most — the toggle is in the top-right.
 # 1. Install dependencies
 npm install
 
-# 2. Set up environment (optional — demo mode needs only Tavily for real search)
+# 2. Set up environment (needs a Groq key + Tavily key)
 cp .env.example .env.local
 
 # 3. Run the dev server
@@ -108,20 +108,16 @@ Open [http://localhost:3000](http://localhost:3000) — sign in with any email
 
 | Variable | Required | Description |
 | -------- | -------- | ----------- |
-| `PROVIDER` | No | `demo` (default) or `groq` |
-| `GROQ_API_KEY` | No | Groq API key for real LLM synthesis |
-| `TAVILY_API_KEY` | No | Tavily API key for real web search (used by both demo and groq modes) |
+| `GROQ_API_KEY` | **Yes** | Groq API key — powers the planner, researchers, and synthesizer |
+| `TAVILY_API_KEY` | No | Tavily API key for real web search (falls back to no sources if unset) |
+| `EXA_API_KEY` | No | Exa API key for the alternative search provider toggle |
 
 `.env.local` is git-ignored — never commit real keys. `.env.example` contains
 placeholders only.
 
-### Demo vs Groq
-
-- **Demo mode** (`PROVIDER=demo`) — runs with no Groq key. Agents still perform
-  *real* Tavily search; only the final synthesis step is a deterministic template
-  instead of an LLM call.
-- **Groq mode** (`PROVIDER=groq`) — full LLM pipeline: the planner, researchers,
-  and synthesizer all use `llama-3.3-70b-versatile`, grounded in Tavily results.
+The pipeline runs entirely on Groq: researchers use `llama-3.1-8b-instant` for
+speed, and the final synthesis uses `llama-3.3-70b-versatile` for quality — all
+grounded in real Tavily/Exa search results.
 
 ## Architecture
 
