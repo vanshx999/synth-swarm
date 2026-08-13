@@ -280,7 +280,7 @@ export function Swarm3D({ active, count = 240, className = '' }: Swarm3DProps) {
     };
   }, [active, count]);
 
-  return <div ref={mountRef} className={`relative ${className}`} />;
+  return <div ref={mountRef} role="img" aria-label="Swarm visualization with orbiting boids and glowing core" className={`relative ${className}`} />;
 }
 
 export default Swarm3D;

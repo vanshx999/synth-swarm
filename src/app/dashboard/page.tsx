@@ -1,8 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
-import type { SwarmEvent } from '@/lib/types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { SearchProvider, SwarmEvent } from '@/lib/types';
 import { getSession, getHistory, saveRun, logout, deleteRun, trimEventsForStorage, topicsShareWords, type ChatHistoryEntry } from '@/lib/history';
 import type { RunModel } from '@/lib/runModel';
 import { applyEvent, emptyRun } from '@/lib/runModel';
@@ -23,6 +23,14 @@ export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Bumped on "New research" to reset the persistent chat view.
   const [sessionToken, setSessionToken] = useState(0);
+  const [searchProvider, setSearchProvider] = useState<SearchProvider>('tavily');
+  const highContrastRef = useRef(false);
+  const [highContrast, setHighContrast] = useState(false);
+
+  const toggleHighContrast = () => {
+    highContrastRef.current = !highContrastRef.current;
+    setHighContrast(highContrastRef.current);
+  };
 
   useEffect(() => {
     const session = getSession();
@@ -109,7 +117,8 @@ export default function DashboardPage() {
   const selected = history.find((h) => h.id === selectedId) ?? null;
 
   return (
-    <div className="h-screen flex overflow-hidden relative">
+    <div className={`h-screen flex overflow-hidden relative bg-canvas${highContrast ? ' high-contrast' : ''}`}>
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 p-4">Skip to main content</a>
       {/* Backdrop handled by layout */}
 
       {/* Mobile sidebar backdrop */}
@@ -265,7 +274,7 @@ export default function DashboardPage() {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 flex flex-col min-w-0">
+      <main id="main" className="flex-1 flex flex-col min-w-0">
         {/* Topbar */}
         <header className="flex items-center gap-3 px-4 lg:px-6 py-3 border-b border-black/5 dark:border-white/10 bg-surface/40 backdrop-blur">
           <button
@@ -318,6 +327,22 @@ export default function DashboardPage() {
             <span className="font-mono text-[9px] uppercase tracking-widest px-3 py-1 rounded-full border bg-brand-deep text-white border-brand-deep">
               ⚡ Groq
             </span>
+            <button
+              type="button"
+              onClick={() => setSearchProvider((provider) => (provider === 'tavily' ? 'exa' : 'tavily'))}
+              aria-pressed={searchProvider === 'exa'}
+              className="font-mono text-[9px] uppercase tracking-widest px-3 py-1 rounded-full border border-brand-primary text-brand-deep dark:text-brand-highlight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
+            >
+              Search: {searchProvider}
+            </button>
+            <button
+              type="button"
+              onClick={toggleHighContrast}
+              aria-pressed={highContrast}
+              className="font-mono text-[9px] uppercase tracking-widest px-3 py-1 rounded-full border border-black/10 dark:border-white/10 text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
+            >
+              Contrast
+            </button>
             <ThemeToggle />
           </div>
         </header>
@@ -333,6 +358,7 @@ export default function DashboardPage() {
               sessionToken={sessionToken}
               onSaveRun={handleSaveRun}
               onActiveRunChange={handleActiveRunChange}
+              searchProvider={searchProvider}
             />
           </div>
           <div className={mode === 'kanban' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>

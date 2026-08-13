@@ -24,6 +24,17 @@
   --brand-highlight: #14FFEC;
 }
 
+.high-contrast {
+  --canvas: #000;
+  --surface: #f0f0f0;
+  --ink: #000;
+  --muted: #333;
+  --brand-primary: #ff0;
+  --brand-deep: #ff0;
+  --brand-support: #f0f0f0;
+  --brand-highlight: #ff0;
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
     --canvas: #212121;
