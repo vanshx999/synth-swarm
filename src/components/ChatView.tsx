@@ -13,6 +13,8 @@ import Swarm3D from '@/components/Swarm3D';
 const FOLLOW_UP_RE =
   /^(explain more|explain further|expound|elaborate|expand on|expand more|elaborate more|go deeper|dive deeper|dive in|break it down|break this down|simplify|make it simpler|clarify|tell me more|more about this|more details?|more|give me more|continue|keep going|keep explaining|so what|is that all|anything else|for example|give examples|and what about|what about it)\s*[!?.]*$/i;
 
+const MAX_CONCURRENT_RUNS = 5;
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -41,10 +43,10 @@ export function ChatView({
   const [input, setInput] = useState('');
   const [running, setRunning] = useState(false);
   const [currentRun, setCurrentRun] = useState<RunModel | null>(null);
+  const [activeRuns, setActiveRuns] = useState<Map<string, RunModel>>(new Map());
   const scrollRef = useRef<HTMLDivElement>(null);
-  const eventsRef = useRef<SwarmEvent[]>([]);
-  const queuedRef = useRef<string | null>(null);
-  const runningRef = useRef(false);
+  const eventsRef = useRef<Map<string, SwarmEvent[]>>(new Map());
+  const activeRunCount = useRef(0);
   // Original (dash-stripped) subject of the last run, so follow-ups like
   // "explain more" expand against the real topic instead of being searched
   // as their own subject.
@@ -60,9 +62,10 @@ export function ChatView({
   useEffect(() => {
     setMessages(bootMessages());
     setCurrentRun(null);
+    setActiveRuns(new Map());
     setRunning(false);
-    eventsRef.current = [];
-    queuedRef.current = null;
+    activeRunCount.current = 0;
+    eventsRef.current = new Map();
     followUpBaseRef.current = null;
   }, [sessionToken]);
 
@@ -96,16 +99,22 @@ export function ChatView({
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, currentRun]);
+  }, [messages, currentRun, activeRuns]);
 
   const appendLog = (run: RunModel, evt: SwarmEvent): RunModel => {
     return applyEvent(run, evt, Date.now());
   };
 
-  const handleEvent = (run: RunModel, evt: SwarmEvent): RunModel => {
+  const handleEvent = (runId: string, run: RunModel, evt: SwarmEvent): RunModel => {
     const updated = appendLog(run, evt);
-    eventsRef.current.push(evt);
-    setCurrentRun((prev) => (prev ? { ...prev, ...updated } : updated));
+    const events = eventsRef.current.get(runId) ?? [];
+    eventsRef.current.set(runId, [...events, evt]);
+    setActiveRuns((prev) => {
+      const next = new Map(prev);
+      next.set(runId, updated);
+      return next;
+    });
+    setCurrentRun(updated);
     onActiveRunChange(updated);
     return updated;
   };
@@ -132,23 +141,22 @@ export function ChatView({
     ]);
     setInput('');
 
-    // If a swarm is still in flight, queue this question and run it after.
-    if (runningRef.current) {
-      queuedRef.current = text;
+    if (activeRunCount.current >= MAX_CONCURRENT_RUNS) {
       setMessages((prev) => [
         ...prev,
         {
-          id: sessionId + '-queued',
+          id: sessionId + '-limit',
           role: 'assistant',
-          text: 'A swarm is still running — I\'ve queued this and will start it as soon as the current one finishes.',
-          kind: 'text',
+          text: `You already have ${MAX_CONCURRENT_RUNS} swarms in flight. Please wait for one to finish before starting another.`,
+          kind: 'error',
           at: Date.now(),
         },
       ]);
       return;
     }
 
-    runningRef.current = true;
+    activeRunCount.current += 1;
+    setRunning(true);
 
     // assistant placeholder
     setMessages((prev) => [
@@ -168,7 +176,8 @@ export function ChatView({
       startedAt: Date.now(),
       running: true,
     };
-    eventsRef.current = [];
+    eventsRef.current.set(sessionId, []);
+    setActiveRuns((prev) => new Map(prev).set(sessionId, run));
     setCurrentRun(run);
     onActiveRunChange(run);
     setRunning(true);
@@ -208,7 +217,7 @@ export function ChatView({
               if (!raw || raw === '[DONE]') continue;
               try {
                 const evt = JSON.parse(raw) as SwarmEvent;
-                runState = handleEvent(runState, evt);
+                runState = handleEvent(sessionId, runState, evt);
               } catch {
                 /* ignore non-JSON frames */
               }
@@ -219,8 +228,8 @@ export function ChatView({
         reader.releaseLock();
       }
 
-      const final = runState;
-      setCurrentRun((prev) => (prev ? { ...prev, running: false } : prev));
+      const final = { ...runState, running: false };
+      setCurrentRun(final);
 
       // promote placeholder to final report
       const reportText =
@@ -242,7 +251,7 @@ export function ChatView({
         )
       );
 
-      onSaveRun(final, text, eventsRef.current);
+      onSaveRun(final, text, eventsRef.current.get(sessionId) ?? []);
       onActiveRunChange(final);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'swarm failed unexpectedly';
@@ -252,17 +261,17 @@ export function ChatView({
       const failed: RunModel = { ...run, topic: text, running: false, error: msg };
       setCurrentRun(failed);
       // Persist failed/interrupted runs too so they don't silently vanish.
-      onSaveRun(failed, text, eventsRef.current);
+      onSaveRun(failed, text, eventsRef.current.get(sessionId) ?? []);
       onActiveRunChange(failed);
     } finally {
-      setRunning(false);
-      runningRef.current = false;
-      // Kick off anything the user queued while this run was in flight.
-      const next = queuedRef.current;
-      if (next) {
-        queuedRef.current = null;
-        void launch(next);
-      }
+      activeRunCount.current = Math.max(0, activeRunCount.current - 1);
+      setRunning(activeRunCount.current > 0);
+      setActiveRuns((prev) => {
+        const next = new Map(prev);
+        next.delete(sessionId);
+        return next;
+      });
+      eventsRef.current.delete(sessionId);
     }
   };
 
@@ -321,7 +330,7 @@ export function ChatView({
         )}
 
         {/* Live swarm panel — shown while running */}
-        {currentRun?.running && (
+        {activeRuns.size > 0 && (
           <div className="flex justify-start">
             <div className="w-full max-w-[92%]">
               <div className="flex items-center gap-2 mb-1.5">
@@ -330,7 +339,7 @@ export function ChatView({
                 </span>
                 <span className="text-xs font-medium text-muted">swarm in flight</span>
               </div>
-              <LiveSwarmPanel run={currentRun} />
+              <LiveSwarmPanel activeRuns={activeRuns} />
             </div>
           </div>
         )}
@@ -365,7 +374,36 @@ export function ChatView({
  * Live swarm panel — mini reporters + 3D visual while a run is active
  * ------------------------------------------------------------------------- */
 
-function LiveSwarmPanel({ run }: { run: RunModel }) {
+function LiveSwarmPanel({ activeRuns }: { activeRuns: Map<string, RunModel> }) {
+  if (activeRuns.size > 1) {
+    return (
+      <div className="rounded-2xl border border-black/8 dark:border-white/10 bg-surface/60 backdrop-blur p-5 overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted">
+            {activeRuns.size} concurrent runs in flight
+          </span>
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-violet-500" />
+          </span>
+        </div>
+        <div className="space-y-4">
+          {[...activeRuns.entries()].map(([runId, run]) => (
+            <div key={runId}>
+              <div className="mb-2 text-sm font-medium text-ink truncate">{run.topic}</div>
+              <SingleSwarmPanel run={run} compact />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const run = [...activeRuns.values()][0];
+  return run ? <SingleSwarmPanel run={run} /> : null;
+}
+
+function SingleSwarmPanel({ run, compact = false }: { run: RunModel; compact?: boolean }) {
   const counts = {
     working: run.tasks.filter((t) => t.status === 'working').length,
     done: run.tasks.filter((t) => t.status === 'done').length,
@@ -393,9 +431,11 @@ function LiveSwarmPanel({ run }: { run: RunModel }) {
         </div>
       </div>
 
-      <div className="h-40 flex items-center justify-center">
-        <Swarm3D active className="w-44 h-44" />
-      </div>
+      {!compact && (
+        <div className="h-40 flex items-center justify-center">
+          <Swarm3D active className="w-44 h-44" />
+        </div>
+      )}
 
       {active && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">

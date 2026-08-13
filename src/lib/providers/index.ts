@@ -173,7 +173,8 @@ export class GroqProvider implements LLMProvider {
           { role: 'user', content: `${searchContext}\n\nTask: ${task}` },
         ],
         temperature: 0.3,
-        max_tokens: 1100,
+        // Keep four parallel researchers within the llama-3.1-8b TPM budget.
+        max_tokens: 800,
       }),
     });
 

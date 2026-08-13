@@ -93,7 +93,8 @@ export class SwarmEngine {
    * bursts don't trip the Groq rate limits.
    */
   async swarmRunner(tasks: Task[]): Promise<void> {
-    const maxConcurrent = Math.min(2, tasks.length);
+    // Drive parallel searches per run while keeping Groq request bursts bounded.
+    const maxConcurrent = Math.min(4, tasks.length);
     let cursor = 0;
     const worker = async () => {
       while (cursor < tasks.length) {
