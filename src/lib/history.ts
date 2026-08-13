@@ -15,9 +15,8 @@ export interface ChatHistoryEntry {
   running?: boolean;
 }
 
-// v2: bumped to wipe the pre-separation stored chats entirely. Each search is
-// now its own standalone entry; previous thread/continuation merging is gone.
-const HISTORY_KEY = 'synth_history_v2';
+// v3: bumped to clear prior chat history for a clean demo slate.
+const HISTORY_KEY = 'synth_history_v3';
 const SESSION_KEY = 'synth_session';
 const MAX_ENTRIES = 30;
 

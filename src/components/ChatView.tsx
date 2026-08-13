@@ -499,8 +499,9 @@ function SingleSwarmPanel({ run, compact = false }: { run: RunModel; compact?: b
   const active = run.tasks.length > 0;
 
   return (
-    <div className="rounded-2xl border border-black/8 dark:border-white/10 bg-surface/60 backdrop-blur p-5 overflow-hidden">
-      <div className="flex items-center justify-between mb-3">
+    <div className="rounded-2xl border border-black/8 dark:border-white/10 bg-surface/60 backdrop-blur overflow-hidden">
+      {/* mission control header */}
+      <div className="flex items-center justify-between px-5 pt-4">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-primary opacity-75" />
@@ -511,25 +512,77 @@ function SingleSwarmPanel({ run, compact = false }: { run: RunModel; compact?: b
           </span>
         </div>
         <div className="flex items-center gap-3 font-mono text-[10px]">
-          <span className="text-muted">ACTIVE {counts.working}</span>
+          <span className="text-brand-deep dark:text-brand-highlight">ACTIVE {counts.working}</span>
           <span className="text-emerald-600">DONE {counts.done}</span>
           <span className="text-rose-600">FAIL {counts.failed}</span>
         </div>
       </div>
 
       {!compact && (
-        <div className="h-40 flex items-center justify-center">
-          <Swarm3D active className="w-44 h-44" />
-        </div>
+        <>
+          <MissionHeader run={run} counts={counts} />
+          <div className="h-64 sm:h-72 md:h-80">
+            <Swarm3D active tasks={run.tasks} className="w-full h-full" />
+          </div>
+        </>
       )}
 
       {active && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 p-4 pt-0">
           {run.tasks.map((t, i) => (
             <MiniReport key={t.id} task={t} index={i} />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function MissionHeader({ run, counts }: { run: RunModel; counts: { working: number; done: number; failed: number; pending: number } }) {
+  const total = run.tasks.length;
+  const finished = counts.done + counts.failed;
+  let progress = 6;
+  let phase = 'planning';
+  if (run.plan) {
+    phase = 'researching';
+    progress = total > 0 ? 15 + (finished / total) * 70 : 15;
+  }
+  if (run.report) {
+    progress = 100;
+    phase = 'synthesis complete';
+  }
+
+  const stage = (name: string, on: boolean) => (
+    <span className={`font-mono text-[10px] uppercase tracking-widest ${on ? 'text-brand-deep dark:text-brand-highlight' : 'text-muted/50'}`}>
+      {name}
+    </span>
+  );
+
+  return (
+    <div className="px-5 pb-2">
+      <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted mb-1">
+        Research mission
+      </div>
+      <div className="text-base font-semibold tracking-tight text-ink truncate mb-3">
+        {run.topic ?? 'Deploying swarm…'}
+      </div>
+      <div className="flex items-center gap-2 mb-1.5">
+        {stage('Planning', !!run.plan)}
+        <span className="text-muted/50">→</span>
+        {stage('Research', total > 0)}
+        <span className="text-muted/50">→</span>
+        {stage('Synthesis', !!run.report)}
+      </div>
+      <div className="h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-brand-primary via-brand-highlight to-brand-deep transition-all duration-700 ease-out"
+          style={{ width: `${Math.max(4, Math.round(progress))}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between mt-1.5 font-mono text-[10px] text-muted">
+        <span className="uppercase tracking-widest">{phase}</span>
+        <span>{counts.working} active · {counts.done} completed · {counts.failed} failed</span>
+      </div>
     </div>
   );
 }
@@ -583,15 +636,42 @@ function MiniReport({ task, index }: { task: RunModel['tasks'][number]; index: n
  * ------------------------------------------------------------------------- */
 
 function ReportBody({ run }: { run: RunModel }) {
+  const doneAgents = run.tasks.filter((t) => t.status === 'done').length;
+  const failedAgents = run.tasks.filter((t) => t.status === 'failed').length;
+  const sources = run.tasks.reduce((n, t) => n + (t.sources?.length ?? 0), 0);
+  const loops = run.report?.loopsUsed ?? 1;
+
+  const stat = (label: string) => (
+    <div className="flex items-center gap-1.5">
+      <span className="w-4 h-4 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center text-[10px] font-bold">✓</span>
+      <span className="text-xs text-muted">{label}</span>
+    </div>
+  );
+
   return (
     <div>
+      {/* mission complete payoff */}
+      <div className="mb-4 rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/60 dark:bg-emerald-950/20 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 status-dot" />
+          <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-emerald-700 dark:text-emerald-300">
+            Mission complete
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {stat(`${run.tasks.length} agents deployed`)}
+          {stat(`${sources} sources analyzed`)}
+          {stat(`${loops} research loop${loops > 1 ? 's' : ''}`)}
+          {stat(`${failedAgents} failed agents`)}
+        </div>
+      </div>
+
       <div className="flex items-center justify-between mb-3">
         <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-emerald-600">
-          ◈ Final Report
+          ◈ Executive report
         </span>
         <div className="flex items-center gap-3 font-mono text-[10px] text-muted">
-          <span>{(run.report?.loopsUsed ?? 1)} loop{(run.report?.loopsUsed ?? 1) > 1 ? 's' : ''}</span>
-          <span>{run.tasks.filter((t) => t.status === 'done').length} agents</span>
+          <span>{doneAgents} agents</span>
         </div>
       </div>
 
