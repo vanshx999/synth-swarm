@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import type { SwarmEvent } from '@/lib/types';
-import { getSession, getHistory, saveRun, logout, deleteRun, trimEventsForStorage, type ChatHistoryEntry } from '@/lib/history';
+import { getSession, getHistory, saveRun, logout, deleteRun, trimEventsForStorage, topicsShareWords, type ChatHistoryEntry } from '@/lib/history';
 import type { RunModel } from '@/lib/runModel';
 import { applyEvent, emptyRun } from '@/lib/runModel';
 import { ChatView } from '@/components/ChatView';
@@ -42,8 +42,25 @@ export default function DashboardPage() {
       createdAt: run.startedAt || Date.now(),
       events: trimEventsForStorage(events),
       report: run.report,
+      questions: [topic.trim()],
+      questionCount: 1,
+      mergeIfSameTopic(newTopic: string) { return topicsShareWords(topic, newTopic); },
       error: run.error,
     };
+
+    const existing = getHistory().slice(0, 10).find((h) => h.mergeIfSameTopic(topic));
+    if (existing) {
+      const merged: ChatHistoryEntry = {
+        ...existing,
+        questions: [...existing.questions, topic.trim()],
+        questionCount: existing.questionCount + 1,
+      };
+      setHistory((prev) => prev.map((h) => (h.id === merged.id ? merged : h)));
+      saveRun(merged);
+      setSelectedId(merged.id);
+      return;
+    }
+
     setHistory((prev) => {
       const next = [entry, ...prev.filter((h) => h.id !== entry.id)].slice(0, 30);
       return next;
@@ -163,11 +180,20 @@ export default function DashboardPage() {
             </div>
           )}
           {history.map((h) => (
-            <button
+            <div
               key={h.id}
+              role="button"
+              tabIndex={0}
               onClick={() => {
                 loadRun(h);
                 setSidebarOpen(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  loadRun(h);
+                  setSidebarOpen(false);
+                }
               }}
               className={`w-full text-left rounded-xl px-3 py-2.5 border transition-all duration-200 group ${
                 selectedId === h.id
@@ -175,10 +201,18 @@ export default function DashboardPage() {
                   : 'bg-surface/50 border-black/5 dark:border-white/10 hover:bg-surface hover:border-violet-200/60 hover:shadow-soft'
               }`}
             >
-              <div className="text-[13px] font-medium truncate text-ink">{h.report?.title || h.topic}</div>
-              <div className="text-[11px] text-muted truncate mt-0.5">
-                {h.report?.summary?.slice(0, 140) ||
-                  (h.error ? `Error: ${h.error}` : 'Run in history')}
+              <div className='flex items-center gap-2'>
+                <span className='font-medium truncate text-ink'>{h.report?.title || h.topic}</span>
+                <span className='text-[10px] text-muted'>{h.questionCount} questions</span>
+              </div>
+              <div className='mt-1 space-y-1'>
+                {h.questions.map((q, i) => (
+                  <details key={i} className='px-2 py-1 rounded-sm bg-surface/50'>
+                    <summary className='cursor-pointer text-[11px] text-muted truncate'>
+                      Q{i + 1}: {q.substring(0, 80)}{q.length > 80 ? '…' : ''}
+                    </summary>
+                  </details>
+                ))}
               </div>
               <div className="flex items-center justify-between mt-1.5">
                 <span className="font-mono text-[9px] text-muted">
@@ -202,7 +236,19 @@ export default function DashboardPage() {
                   )}
                 </span>
               </div>
-            </button>
+              <button
+                type="button"
+                className="mt-2 text-[11px] font-medium text-violet-600 hover:text-violet-700"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setSelectedId(null);
+                  setActiveRun(null);
+                  setSessionToken((t) => t + 1);
+                }}
+              >
+                Start new topic
+              </button>
+            </div>
           ))}
         </div>
 
@@ -283,6 +329,7 @@ export default function DashboardPage() {
             <ChatView
               loadedRun={selected ? activeRun : null}
               loadedKey={selectedId ?? undefined}
+              loadedQuestions={selected?.questions}
               sessionToken={sessionToken}
               onSaveRun={handleSaveRun}
               onActiveRunChange={handleActiveRunChange}

@@ -17,7 +17,8 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   text: string;
-  kind?: 'text' | 'report' | 'error';
+  kind?: 'text' | 'report' | 'error' | 'questions';
+  questions?: string[];
   run?: RunModel;
   at: number;
 }
@@ -25,6 +26,7 @@ interface Message {
 interface ChatViewProps {
   loadedRun?: RunModel | null;
   loadedKey?: string;
+  loadedQuestions?: string[];
   sessionToken?: number;
   onSaveRun: (run: RunModel, topic: string, events: SwarmEvent[]) => void;
   onActiveRunChange: (run: RunModel | null) => void;
@@ -33,6 +35,7 @@ interface ChatViewProps {
 export function ChatView({
   loadedRun,
   loadedKey,
+  loadedQuestions,
   sessionToken = 0,
   onSaveRun,
   onActiveRunChange,
@@ -84,14 +87,26 @@ export function ChatView({
       run: loadedRun,
       at: loadedRun.startedAt || Date.now(),
     };
+    const questionsMsg: Message | null = loadedQuestions?.length
+      ? {
+          id: `loaded-q-${loadedKey ?? loadedRun.startedAt}`,
+          role: 'assistant',
+          text: 'Questions studied in this thread',
+          kind: 'questions',
+          questions: loadedQuestions,
+          at: loadedRun.startedAt || Date.now(),
+        }
+      : null;
     const userMsg: Message | null = loadedRun.topic
       ? { id: `loaded-u-${loadedKey ?? loadedRun.startedAt}`, role: 'user', text: loadedRun.topic, at: loadedRun.startedAt || Date.now() }
       : null;
     // Replace the thread entirely — each history chat is its own conversation.
-    setMessages(userMsg ? [userMsg, reportMsg] : [reportMsg]);
+    setMessages(
+      (userMsg ? [userMsg] : []).concat(questionsMsg ? [questionsMsg] : [], reportMsg)
+    );
     setCurrentRun(loadedRun);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadedKey]);
+  }, [loadedKey, loadedQuestions]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -280,6 +295,21 @@ export function ChatView({
             <div key={m.id} className="flex justify-end">
               <div className="max-w-[78%] rounded-2xl rounded-br-sm bg-gradient-to-r from-cyan-500/15 via-violet-500/15 to-fuchsia-500/15 border border-black/5 dark:border-white/10 px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap">
                 {m.text}
+              </div>
+            </div>
+          ) : m.kind === 'questions' ? (
+            <div key={m.id} className="flex justify-start">
+              <div className="max-w-[92%] glass rounded-2xl border border-black/5 dark:border-white/10 p-4">
+                <div className="text-xs font-medium text-muted mb-2">{m.text}</div>
+                <div className="space-y-1">
+                  {m.questions?.map((q, i) => (
+                    <details key={i} className="px-2 py-1 rounded-sm bg-surface/50">
+                      <summary className="cursor-pointer text-[11px] text-muted truncate">
+                        Q{i + 1}: {q.substring(0, 80)}{q.length > 80 ? '…' : ''}
+                      </summary>
+                    </details>
+                  ))}
+                </div>
               </div>
             </div>
           ) : m.kind === 'report' && m.run ? (
