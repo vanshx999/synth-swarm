@@ -25,6 +25,7 @@ export interface Gap {
 }
 
 export interface Report {
+  title: string;
   summary: string;
   sections: { title: string; content: string }[];
   loopsUsed: number;
@@ -52,7 +53,6 @@ export interface LLMProvider {
 
 export interface ProviderConfig {
   groqApiKey?: string;
-  provider: 'demo' | 'groq';
 }
 
 export type SwarmEventCallback = (event: SwarmEvent) => void;

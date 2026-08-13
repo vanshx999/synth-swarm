@@ -78,6 +78,8 @@ export function applyEvent(run: RunModel, evt: SwarmEvent, at: number): RunModel
     case 'final_report':
       next.report = evt.report;
       next.running = false;
+      // A real report supersedes any transient error seen mid-run.
+      next.error = undefined;
       break;
 
     case 'error':

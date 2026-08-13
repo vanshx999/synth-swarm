@@ -3,7 +3,7 @@ import type { SwarmEvent, Report } from '@/lib/types';
 export interface ChatHistoryEntry {
   id: string;
   topic: string;
-  provider: 'demo' | 'groq';
+  provider: 'groq';
   createdAt: number;
   events: SwarmEvent[];
   report: Report | null;
@@ -26,18 +26,55 @@ export function getHistory(): ChatHistoryEntry[] {
   }
 }
 
+/**
+ * Slim down run events before they touch localStorage. Raw task results and
+ * source snippets are the bulk of the payload; the retained fields are enough
+ * to rebuild the kanban board and resources list after a reload while a full
+ * run stays around 6-10KB instead of 60-80KB.
+ */
+export function trimEventsForStorage(events: SwarmEvent[]): SwarmEvent[] {
+  return events.map((e) => {
+    if (e.type === 'task_update') {
+      const t = e.task;
+      return {
+        ...e,
+        task: {
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          error: t.error,
+          result: typeof t.result === 'string' ? t.result.slice(0, 400) : undefined,
+          sources: Array.isArray(t.sources)
+            ? t.sources.map((s) => ({
+                title: s.title,
+                url: s.url,
+                snippet: (s.snippet || '').slice(0, 160),
+              }))
+            : undefined,
+        },
+      };
+    }
+    return e;
+  });
+}
+
 export function saveRun(entry: ChatHistoryEntry): void {
-  const history = getHistory();
-  history.unshift(entry);
-  const trimmed = history.slice(0, MAX_ENTRIES);
+  const stored: ChatHistoryEntry = { ...entry, events: trimEventsForStorage(entry.events) };
+  const history = [stored, ...getHistory().filter((h) => h.id !== stored.id)].slice(0, MAX_ENTRIES);
   try {
-    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed));
+    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
   } catch {
-    // history may exceed quota — drop oldest batch and retry once
+    // Quota hit — retry with a much smaller window so the newest run survives.
     try {
-      window.localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 10)));
+      window.localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 5)));
     } catch {
-      // storage unavailable — ignore
+      // Last resort: keep metadata + report only (drop event streams entirely).
+      try {
+        const minimal = history.slice(0, 20).map((h) => ({ ...h, events: [] }));
+        window.localStorage.setItem(HISTORY_KEY, JSON.stringify(minimal));
+      } catch {
+        // storage unavailable entirely — ignore
+      }
     }
   }
 }

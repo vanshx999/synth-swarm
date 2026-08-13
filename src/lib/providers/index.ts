@@ -11,7 +11,7 @@ async function searchTavily(query: string): Promise<Source[]> {
     const res = await fetch('https://api.tavily.com/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, api_key: apiKey, search_depth: 'basic', max_results: 5 }),
+      body: JSON.stringify({ query, api_key: apiKey, search_depth: 'basic', max_results: 3 }),
     });
     if (!res.ok) return [];
     const data = await res.json();
@@ -31,208 +31,11 @@ async function searchTavily(query: string): Promise<Source[]> {
 
 function sourcesToContext(sources: Source[]): string {
   return sources
-    .map(
-      (s, i) =>
-        `[${i + 1}] ${s.title}\nURL: ${s.url}\nSnippet: ${s.snippet}`,
-    )
+    .map((s, i) => {
+      const snippet = s.snippet.length > 500 ? `${s.snippet.slice(0, 500)}…` : s.snippet;
+      return `[${i + 1}] ${s.title}\nURL: ${s.url}\nSnippet: ${snippet}`;
+    })
     .join('\n\n');
-}
-
-// ---------------------------------------------------------------------------
-// DemoProvider
-// ---------------------------------------------------------------------------
-
-export class DemoProvider implements LLMProvider {
-  name = 'demo';
-
-  isAvailable(): boolean {
-    return true;
-  }
-
-  async runAgent(
-    role: string,
-    task: string,
-    onThinking?: (s: string) => void,
-    onSources?: (sources: Source[]) => void
-  ): Promise<string> {
-    const isPlanner = role.includes('plan');
-    const isSynthesizer = role === 'synthesizer' || role === 'writer';
-
-    // For synthesizer, the task IS the full synthesis prompt with all research results
-    // Do NOT search Tavily - use the provided research directly
-    if (isSynthesizer) {
-      onThinking?.('synthesizing...');
-      const ms = 1500 + Math.random() * 1000;
-      await new Promise<void>((r) => setTimeout(r, ms));
-      onThinking?.('drafting report...');
-      return this.synthesize(task); // task = full synthesis prompt with all research
-    }
-
-    // For planner and researcher: do Tavily search
-    // Clean the search query — strip parenthetical hints, "Follow-up:" prefix
-    let searchQuery = task
-      .replace(/\s*\(.*?\)\s*/g, ' ')  // remove (use search results...) / (synthesize...)
-      .replace(/^Follow-up:\s*/i, '')  // remove "Follow-up: " prefix for gap tasks
-      .trim();
-    if (isPlanner) {
-      const topicMatch = task.match(/"([^"]+)"/);
-      if (topicMatch) searchQuery = topicMatch[1];
-    }
-
-    onThinking?.('searching...');
-
-    const sources = await searchTavily(searchQuery);
-    onSources?.(sources);
-
-    onThinking?.(`found ${sources.length} results`);
-
-    const ms = 1000 + Math.random() * 1000;
-    await new Promise<void>((r) => setTimeout(r, ms));
-
-    if (isPlanner) {
-      return this.planFromSearch(task, sources);
-    }
-
-    if (sources.length > 0) {
-      return this.buildResearchSummary(sources);
-    }
-
-    return 'Limited search results found for this query.';
-  }
-
-  private buildResearchSummary(sources: Source[]): string {
-    const lines: string[] = ['## Research Findings\n'];
-    for (const s of sources) {
-      lines.push(`### ${s.title}`);
-      lines.push(`${s.snippet}`);
-      lines.push(`— [${s.url}](${s.url})`);
-      lines.push('');
-    }
-    return lines.join('\n');
-  }
-
-  private planFromSearch(task: string, sources: Source[]): string {
-    // Extract the real topic from the planner prompt (which includes instructions)
-    const topicMatch = task.match(/"([^"]+)"/);
-    const topic = topicMatch ? topicMatch[1] : task.replace(/^You are a research planner.*?topic(\s|")/i, '').replace(/".*/, '').trim() || task;
-    const angles = [
-      `Current state and key players in ${topic}`,
-      `Policy and regulatory environment for ${topic}`,
-      `Talent, research, and innovation pipeline for ${topic}`,
-      `Major challenges and barriers in ${topic}`,
-      `Future outlook and predictions for ${topic}`,
-    ];
-    const suffix = sources.length > 0 ? ' (use search results as primary source)' : ' (synthesize from general knowledge)';
-    const tasks: { id: string; title: string }[] = [];
-    for (let i = 0; i < angles.length; i++) {
-      tasks.push({ id: `t${i + 1}`, title: `${angles[i]}${suffix}` });
-    }
-    const plan = {
-      reasoning: `Decomposed "${topic}" into 5 research angles covering landscape, policy, talent, challenges, and outlook.`,
-      tasks,
-    };
-    return JSON.stringify(plan);
-  }
-
-  private synthesize(prompt: string): string {
-    // The prompt contains all the research results from all tasks
-    // Parse the task results from the prompt and create a structured report
-    const taskResults = this.extractTaskResults(prompt);
-
-    if (taskResults.length === 0) {
-      return JSON.stringify({
-        summary: 'No research results available to synthesize.',
-        sections: [],
-        gaps: {
-          missing: ['All research areas'],
-          reasoning: 'No completed task results were provided for synthesis.',
-        },
-      });
-    }
-
-    // Condensed executive answer — not a per-task dump.
-    // Keep 3-5 short thematic sections, each trimmed to a couple sentences.
-    const topics = taskResults.map((tr) => this.cleanTitle(tr.title));
-    const directAnswer = this.directAnswer(taskResults);
-
-    const sections = taskResults.slice(0, 4).map((tr) => ({
-      title: this.cleanTitle(tr.title),
-      content: this.condense(tr.result),
-    }));
-
-    // Detect potential gaps from the task titles
-    const coveredTopics = topics.join(' ').toLowerCase();
-    const commonGaps = [
-      'implementation details',
-      'cost analysis',
-      'security considerations',
-      'scalability patterns',
-      'real-world case studies',
-    ];
-    const missing = commonGaps
-      .filter((gap) => !coveredTopics.includes(gap))
-      .slice(0, 3);
-
-    return JSON.stringify({
-      summary: directAnswer,
-      sections,
-      gaps: {
-        missing,
-        reasoning: missing.length > 0
-          ? `Potential areas for deeper exploration: ${missing.join(', ')}.`
-          : 'Coverage appears comprehensive across all research angles.',
-      },
-    });
-  }
-
-  /** A 1-2 sentence direct answer drawn from the first findings. */
-  private directAnswer(results: { title: string; result: string }[]): string {
-    const first = results[0]?.result || '';
-    const lines = first
-      .replace(/^#{1,6}\s*/gm, '')
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-      .split(/\n+/)
-      .map((l) => l.trim())
-      .filter((l) => l.length > 20);
-    const lead = (lines[0] || 'Findings synthesized from the swarm.').slice(0, 220);
-    return `${lead}${lead.endsWith('.') ? '' : '.'} (Condensed from ${results.length} research areas.)`;
-  }
-
-  private cleanTitle(title: string): string {
-    return title
-      .replace(/^Follow-up:\s*/i, '')
-      .replace(/\s*\(use search results.*?\)\s*/gi, '')
-      .replace(/\s*\(synthesize.*?\)\s*/gi, '')
-      .trim();
-  }
-
-  private condense(content: string): string {
-    const text = content
-      .replace(/^#{1,6}\s*/gm, '')
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-      .replace(/\s+/g, ' ')
-      .trim();
-    return text.slice(0, 220);
-  }
-
-  private extractTaskResults(prompt: string): { title: string; result: string }[] {
-    const results: { title: string; result: string }[] = [];
-    const sections = prompt.split('\n\n---\n\n');
-    
-    for (const section of sections) {
-      const titleMatch = section.match(/^##\s+(.+)$/m);
-      const contentMatch = section.match(/^##\s+.+?\n([\s\S]+)/);
-      
-      if (titleMatch && contentMatch) {
-        results.push({
-          title: titleMatch[1].trim(),
-          result: contentMatch[1].trim(),
-        });
-      }
-    }
-    
-    return results;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -244,6 +47,7 @@ export class GroqProvider implements LLMProvider {
 
   private apiKey: string;
   private baseUrl = 'https://api.groq.com/openai/v1/chat/completions';
+  private model = 'llama-3.1-8b-instant';
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -251,6 +55,29 @@ export class GroqProvider implements LLMProvider {
 
   isAvailable(): boolean {
     return this.apiKey.length > 0;
+  }
+
+  /** Retry transient Groq failures (429 / 5xx), honoring Retry-After on 429. */
+  private async fetchRetry(init: RequestInit): Promise<Response> {
+    const MAX_ATTEMPTS = 12;
+    let attempt = 0;
+    for (;;) {
+      const response = await fetch(this.baseUrl, init);
+      const status = response.status;
+      const retriable = status === 429 || status === 500 || status === 503;
+      attempt++;
+      if (!retriable || attempt >= MAX_ATTEMPTS) return response;
+
+      let delay: number;
+      if (status === 429) {
+        const retryAfter = Number(response.headers.get('retry-after'));
+        // Retry-After is in seconds; cap so the run still progresses.
+        delay = retryAfter > 0 ? Math.min(retryAfter, 15) * 1000 : 1000;
+      } else {
+        delay = Math.pow(1.9, attempt) * 1000 + Math.random() * 500;
+      }
+      await new Promise<void>((r) => setTimeout(r, delay));
+    }
   }
 
   async runAgent(
@@ -272,24 +99,24 @@ export class GroqProvider implements LLMProvider {
       onThinking?.('synthesizing...');
 
       const systemPrompt =
-        `${this.getSystemPrompt(role)}\n\nWrite a tight executive answer under 400 words total. Do NOT list or repeat raw findings — synthesize them. Structure: (1) a 2-3 sentence direct answer to the topic up top, then (2) 3-5 short thematic sections (merge overlapping findings, do NOT write one section per research task), each 2-4 sentences MAX, in your own words. Cut anything not essential to directly answering the topic. Output ONLY valid JSON with "summary" (the 2-3 sentence direct answer), "sections" array [{title, content}], and "gaps": {"missing": string[], "reasoning": string}.`;
+        `${this.getSystemPrompt(role)}\n\nWrite a tight executive answer under 400 words total. Do NOT list or repeat raw findings — synthesize them. Structure: (1) a short, topic-accurate "title" (e.g. "What is Kanban?"), (2) a 2-3 sentence direct answer to the topic up top, then (3) 3-5 short thematic sections (merge overlapping findings, do NOT write one section per research task), each 2-4 sentences MAX, in your own words. Cut anything not essential to directly answering the topic. Output ONLY valid JSON with "title", "summary" (the 2-3 sentence direct answer), "sections" array [{title, content}], and "gaps": {"missing": string[], "reasoning": string}. Only name gaps genuinely missing for THIS topic — when the research already answers the topic well, set "missing" to [] so the loop can stop.`;
 
       onThinking?.('drafting report...');
 
-      const response = await fetch(this.baseUrl, {
+      const response = await this.fetchRetry({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: this.model,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: task }, // task = full synthesis prompt with all research
           ],
           temperature: 0.3,
-          max_tokens: 900,
+          max_tokens: 700,
         }),
       });
 
@@ -333,20 +160,20 @@ export class GroqProvider implements LLMProvider {
     const systemPrompt =
       `${this.getSystemPrompt(role)}\n\nOnly make claims supported by the provided search results. If results don't cover something, state that explicitly.`;
 
-    const response = await fetch(this.baseUrl, {
+    const response = await this.fetchRetry({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: this.model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `${searchContext}\n\nTask: ${task}` },
         ],
         temperature: 0.3,
-        max_tokens: 4096,
+        max_tokens: 1100,
       }),
     });
 
@@ -372,21 +199,21 @@ export class GroqProvider implements LLMProvider {
       analyst:
         'You are a strategic analyst. Synthesize findings across multiple research sources, identify cross-cutting patterns, and surface non-obvious connections. Ground all claims in provided search results.',
       synthesizer:
-        'You are an executive research director. Synthesize ALL provided research into a comprehensive report. After synthesizing, critically evaluate if any important angles were missed — but only name gaps SPECIFIC to this topic, not generic categories. Create a JSON object with "summary", "sections" array [{title, content}], and "gaps": { "missing": string[], "reasoning": string }. Output ONLY valid JSON.',
+        'You are an executive research director. Synthesize ALL provided research into a tight executive report with a short topic-accurate "title". After synthesizing, critically evaluate if any important angles were missed — but only name gaps SPECIFIC to this topic, never generic categories, and set "missing" to [] when coverage is already good. Create a JSON object with "title", "summary", "sections" array [{title, content}], and "gaps": { "missing": string[], "reasoning": string }. Output ONLY valid JSON.',
       writer:
-        'You are an executive research director. Synthesize ALL provided research into a comprehensive report. After synthesizing, critically evaluate if any important angles were missed — but only name gaps SPECIFIC to this topic, not generic categories. Create a JSON object with "summary", "sections" array [{title, content}], and "gaps": { "missing": string[], "reasoning": string }. Output ONLY valid JSON.',
+        'You are an executive research director. Synthesize ALL provided research into a tight executive report with a short topic-accurate "title". After synthesizing, critically evaluate if any important angles were missed — but only name gaps SPECIFIC to this topic, never generic categories, and set "missing" to [] when coverage is already good. Create a JSON object with "title", "summary", "sections" array [{title, content}], and "gaps": { "missing": string[], "reasoning": string }. Output ONLY valid JSON.',
     };
     return prompts[role] || prompts.researcher;
   }
 }
 
 // ---------------------------------------------------------------------------
-// Provider factory
+// Provider factory — Groq is the only provider.
 // ---------------------------------------------------------------------------
 
 export function getProvider(config: ProviderConfig): LLMProvider {
-  if (config.provider === 'groq' && config.groqApiKey) {
-    return new GroqProvider(config.groqApiKey);
+  if (!config.groqApiKey) {
+    throw new Error('GROQ_API_KEY is not configured');
   }
-  return new DemoProvider();
+  return new GroqProvider(config.groqApiKey);
 }

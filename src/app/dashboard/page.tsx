@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import type { SwarmEvent } from '@/lib/types';
-import { getSession, getHistory, saveRun, logout, deleteRun, type ChatHistoryEntry } from '@/lib/history';
+import { getSession, getHistory, saveRun, logout, deleteRun, trimEventsForStorage, type ChatHistoryEntry } from '@/lib/history';
 import type { RunModel } from '@/lib/runModel';
 import { applyEvent, emptyRun } from '@/lib/runModel';
 import { ChatView } from '@/components/ChatView';
@@ -17,11 +17,12 @@ export default function DashboardPage() {
   const router = useRouter();
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [mode, setMode] = useState<ViewMode>('chat');
-  const [provider, setProvider] = useState<'demo' | 'groq'>('demo');
   const [history, setHistory] = useState<ChatHistoryEntry[]>([]);
   const [activeRun, setActiveRun] = useState<RunModel | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Bumped on "New research" to reset the persistent chat view.
+  const [sessionToken, setSessionToken] = useState(0);
 
   useEffect(() => {
     const session = getSession();
@@ -37,9 +38,9 @@ export default function DashboardPage() {
     const entry: ChatHistoryEntry = {
       id: run.startedAt ? `run-${run.startedAt}` : `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       topic,
-      provider,
+      provider: 'groq',
       createdAt: run.startedAt || Date.now(),
-      events,
+      events: trimEventsForStorage(events),
       report: run.report,
       error: run.error,
     };
@@ -49,7 +50,7 @@ export default function DashboardPage() {
     });
     saveRun(entry);
     setSelectedId(entry.id);
-  }, [provider]);
+  }, []);
 
   const handleActiveRunChange = useCallback((run: RunModel | null) => {
     setActiveRun(run);
@@ -139,6 +140,7 @@ export default function DashboardPage() {
               setActiveRun(null);
               setMode('chat');
               setSidebarOpen(false);
+              setSessionToken((t) => t + 1);
             }}
             className="w-full flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 via-violet-500 to-fuchsia-500 text-white py-2.5 px-3 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98] shadow-brand-glow"
           >
@@ -173,7 +175,7 @@ export default function DashboardPage() {
                   : 'bg-surface/50 border-black/5 dark:border-white/10 hover:bg-surface hover:border-violet-200/60 hover:shadow-soft'
               }`}
             >
-              <div className="text-[13px] font-medium truncate text-ink">{h.topic}</div>
+              <div className="text-[13px] font-medium truncate text-ink">{h.report?.title || h.topic}</div>
               <div className="text-[11px] text-muted truncate mt-0.5">
                 {h.report?.summary?.slice(0, 140) ||
                   (h.error ? `Error: ${h.error}` : 'Run in history')}
@@ -189,7 +191,7 @@ export default function DashboardPage() {
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="font-mono text-[9px] uppercase px-1 rounded bg-surface/60 border border-black/5 dark:border-white/10 text-muted">
-                    {h.provider}
+                    ⚡ groq
                   </span>
                   {h.report ? (
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="report ready" />
@@ -265,43 +267,33 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          {/* Provider toggle */}
+          {/* Provider */}
           <div className="ml-auto flex items-center gap-1.5">
-            {(['demo', 'groq'] as const).map((p) => (
-              <button
-                key={p}
-                onClick={() => setProvider(p)}
-                title={p === 'demo' ? 'Instant demo (no API key)' : 'Live Groq agents'}
-                className={`font-mono text-[9px] uppercase tracking-widest px-3 py-1 rounded-full border transition-all ${
-                  provider === p
-                    ? p === 'groq'
-                      ? 'bg-violet-500 text-white border-violet-500'
-                      : 'bg-cyan-500 text-white border-cyan-500'
-                    : 'bg-surface/60 text-muted border-black/10 dark:border-white/10 hover:text-ink'
-                }`}
-              >
-                {p === 'groq' ? '⚡ Groq' : '◈ Demo'}
-              </button>
-            ))}
+            <span className="font-mono text-[9px] uppercase tracking-widest px-3 py-1 rounded-full border bg-violet-500 text-white border-violet-500">
+              ⚡ Groq
+            </span>
             <ThemeToggle />
           </div>
         </header>
 
-        {/* Content */}
-        <div className="flex-1 min-h-0 flex flex-col">
-          {mode === 'chat' ? (
+        {/* Content — all views stay mounted so switching tabs never loses
+            the in-flight/current chat state; inactive views are hidden. */}
+        <div className="flex-1 min-h-0 relative flex">
+          <div className={mode === 'chat' ? 'absolute inset-0 flex' : 'absolute inset-0 hidden'}>
             <ChatView
-              provider={provider}
               loadedRun={selected ? activeRun : null}
               loadedKey={selectedId ?? undefined}
+              sessionToken={sessionToken}
               onSaveRun={handleSaveRun}
               onActiveRunChange={handleActiveRunChange}
             />
-          ) : mode === 'kanban' ? (
+          </div>
+          <div className={mode === 'kanban' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
             <KanbanView run={activeRun} />
-          ) : (
+          </div>
+          <div className={mode === 'resources' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
             <ResourcesView run={activeRun} />
-          )}
+          </div>
         </div>
       </main>
     </div>

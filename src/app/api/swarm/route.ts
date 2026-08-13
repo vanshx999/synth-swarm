@@ -6,7 +6,7 @@ import type { ProviderConfig, SwarmEvent, SwarmEventCallback } from '@/lib/types
 const KEEPALIVE_INTERVAL_MS = 15_000;
 
 export async function POST(request: NextRequest) {
-  let body: { topic?: unknown; provider?: unknown };
+  let body: { topic?: unknown };
 
   try {
     body = await request.json();
@@ -22,13 +22,17 @@ export async function POST(request: NextRequest) {
   }
 
   const topic: string = body.topic;
-  const providerChoice: 'demo' | 'groq' =
-    body.provider === 'groq' ? 'groq' : body.provider === 'demo' ? 'demo' : 'demo';
   const groqApiKey = process.env.GROQ_API_KEY;
 
+  if (!groqApiKey) {
+    return new Response(JSON.stringify({ error: 'GROQ_API_KEY is not configured on the server' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const config: ProviderConfig = {
-    provider: providerChoice,
-    groqApiKey: groqApiKey ?? undefined,
+    groqApiKey,
   };
 
   const encoder = new TextEncoder();
@@ -40,7 +44,7 @@ export async function POST(request: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
       };
 
-      // Keep the connection alive during long operations (15s comment line).
+      // Keep the connection alive during long operations.
       keepAlive = setInterval(() => {
         try {
           controller.enqueue(encoder.encode(`: keepalive\n\n`));

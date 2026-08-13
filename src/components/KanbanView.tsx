@@ -1,6 +1,7 @@
 'use client';
 
 import type { RunModel } from '@/lib/runModel';
+import { displayTitle } from '@/lib/topic';
 
 interface KanbanViewProps {
   run: RunModel | null;
@@ -128,7 +129,7 @@ export function KanbanView({ run }: KanbanViewProps) {
                       </span>
                     </div>
                     <div className={`mt-1.5 text-[13px] leading-snug font-medium ${style.head}`}>
-                      {t.title}
+                      {displayTitle(t.title)}
                     </div>
                     {t.status === 'working' && t.thinking && (
                       <div className="mt-1.5 font-mono text-[10px] text-cyan-600 animate-think">{t.thinking}</div>

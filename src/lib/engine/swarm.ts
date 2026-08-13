@@ -1,7 +1,5 @@
 import { Task, Plan, Gap, Report, SwarmEvent, SwarmEventCallback, LLMProvider } from '../types';
-
-const FALLBACK_REASONING =
-  'Split into historical context, technical mechanism, current debates, and counterarguments — chosen to cover both factual grounding and contested framing.';
+import { classifyTopic } from '../topic';
 
 /**
  * Extract the first balanced JSON object/array from a blob of LLM output.
@@ -50,7 +48,7 @@ function extractJson(text: string): string | null {
 export class SwarmEngine {
   private provider: LLMProvider;
   private onEvent: SwarmEventCallback;
-  private maxLoops = 3;
+  private maxLoops = 2;
 
   constructor(provider: LLMProvider, onEvent: SwarmEventCallback) {
     this.provider = provider;
@@ -66,82 +64,46 @@ export class SwarmEngine {
    * plan when the LLM output cannot be parsed.
    */
   async plan(topic: string): Promise<Plan> {
-    const prompt = `You are a research planner. Decompose the topic "${topic}" into 5 to 7 focused research tasks.
-
-Output exactly one JSON object in this shape (no prose, no markdown):
-{
-  "tasks": [ { "id": "string", "title": "string" } ],
-  "reasoning": "string"
-}
-Each task id must be unique. "reasoning" should briefly explain how the tasks cover the topic.`;
-
-    let response: string;
-    try {
-      response = await this.provider.runAgent('planner', prompt);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown planning error';
-      this.emit({ type: 'error', message });
-      const plan = this.fallbackPlan(topic);
-      this.emit({ type: 'plan_ready', plan });
-      return plan;
-    }
-
-    const plan = this.parsePlan(response, topic);
+    // Use the deterministic, topic-aware plan every time. It frees the runtime
+    // budget for the researcher + synthesizer calls that actually need the LLM,
+    // and guarantees a plan even when Groq is mid-throttle.
+    const plan = this.fallbackPlan(topic);
     this.emit({ type: 'plan_ready', plan });
     return plan;
   }
 
-  private parsePlan(text: string, topic: string): Plan {
-    const json = extractJson(text);
-    if (json) {
-      try {
-        const parsed = JSON.parse(json);
-        if (parsed && Array.isArray(parsed.tasks)) {
-          const tasks: Task[] = parsed.tasks
-            .map((t: unknown, i: number): Task | null => {
-              if (!t || typeof t !== 'object') return null;
-              const obj = t as Record<string, unknown>;
-              return {
-                id: typeof obj.id === 'string' ? obj.id : `t${i + 1}`,
-                title: typeof obj.title === 'string' ? obj.title : `Research task ${i + 1}`,
-                status: 'pending',
-              };
-            })
-            .filter((t: Task | null): t is Task => t !== null);
-
-          if (tasks.length > 0) {
-            return {
-              tasks,
-              reasoning: typeof parsed.reasoning === 'string' ? parsed.reasoning : '',
-            };
-          }
-        }
-      } catch {
-        // fall through to fallback plan
-      }
-    }
-    return this.fallbackPlan(topic);
-  }
-
   private fallbackPlan(topic: string): Plan {
+    // Even when the LLM output is unparseable, build a plan tailored to the
+    // topic's type (definitional / entity / market / comparison / general)
+    // rather than stamping one fixed template onto everything.
+    const profile = classifyTopic(topic);
     return {
-      tasks: [
-        { id: 't1', title: `Historical context of ${topic}`, status: 'pending' },
-        { id: 't2', title: `Technical mechanism of ${topic}`, status: 'pending' },
-        { id: 't3', title: `Current debates around ${topic}`, status: 'pending' },
-        { id: 't4', title: `Counterarguments to ${topic}`, status: 'pending' },
-        { id: 't5', title: `Synthesis of ${topic}`, status: 'pending' },
-      ],
-      reasoning: FALLBACK_REASONING,
+      tasks: profile.angles.map((angle, i) => ({
+        id: `t${i + 1}`,
+        title: angle.title,
+        status: 'pending' as const,
+      })),
+      reasoning: profile.reasoning,
     };
   }
 
   /**
    * Run all tasks IN PARALLEL, emitting a task_update event for every
-   * transition (pending -> working -> done/failed).
+   * transition (pending -> working -> done/failed). Concurrency is capped so
+   * bursts don't trip the Groq rate limits.
    */
   async swarmRunner(tasks: Task[]): Promise<void> {
-    await Promise.all(tasks.map((task) => this.runTask(task)));
+    const maxConcurrent = Math.min(2, tasks.length);
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < tasks.length) {
+        const task = tasks[cursor++];
+        await this.runTask(task);
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.max(1, maxConcurrent) }, () => worker())
+    );
   }
 
   private async runTask(task: Task): Promise<void> {
@@ -174,18 +136,26 @@ Each task id must be unique. "reasoning" should briefly explain how the tasks co
    * Ask the LLM to merge completed task results into a Report and to identify
    * remaining gaps. Emits gap_detected when gaps are found.
    */
-  async synthesizer(tasks: Task[], loopNum: number): Promise<{ report: Report; gap?: Gap }> {
-    const body =
-      tasks
-        .filter((t) => t.status === 'done' && t.result)
-        .map((t) => `## ${t.title}\n${t.result}`)
-        .join('\n\n---\n\n') || 'No completed research results were provided.';
+  async synthesizer(tasks: Task[], loopNum: number, topic: string): Promise<{ report: Report; gap?: Gap }> {
+const body =
+    tasks
+      .filter((t) => t.status === 'done' && t.result)
+      .map((t) => {
+        const result = t.result!.replace(/\s+/g, ' ').trim();
+        return `## ${t.title}\n${result.slice(0, 1500)}${result.length > 1500 ? '…' : ''}`;
+      })
+      .join('\n\n---\n\n') || 'No completed research results were provided.';
 
-    const prompt = `You are a report synthesizer. Merge the following research task results into a final report and identify any gaps that still need research. Identify what SPECIFIC aspects of the topic are NOT covered. Do NOT suggest generic categories — only name gaps specific to THIS topic.
+    const prompt = `Topic: ${topic}
+
+You are a report synthesizer. Merge the following research task results into a final report that directly answers this topic, and identify any gaps that still need research. Only name gaps SPECIFIC to this topic — never generic categories. If the results already answer the topic well, set "gap" to { "missing": [], "reasoning": "Complete" } so the loop stops.
+
+DO NOT propose generic gaps such as "broader impact", "future outlook", "comparison with other frameworks", "deeper analysis", "real-world applications", or "more context". A gap must be a concrete, named subject the research entirely omits. When in doubt, set "missing" to [] — extra loops are worse than none.
 
 Output exactly one JSON object in this shape (no prose, no markdown):
 {
   "report": {
+    "title": "string",
     "summary": "string",
     "sections": [ { "title": "string", "content": "string" } ]
   },
@@ -194,12 +164,12 @@ Output exactly one JSON object in this shape (no prose, no markdown):
     "reasoning": "string"
   }
 }
-When the report is complete and no further research is needed, set "gap" to { "missing": [], "reasoning": "Complete" }.
+"title" must be a short, topic-accurate title generated from the topic itself — never scraped from a source article.
 
 Research results:
 ${body}`;
 
-    let report: Report = this.fallbackReport(tasks, loopNum);
+    let report: Report = this.fallbackReport(tasks, loopNum, topic);
     let gap: Gap | undefined;
 
     try {
@@ -208,7 +178,7 @@ ${body}`;
       if (json) {
         const parsed = JSON.parse(json);
         const reportRaw = parsed && typeof parsed === 'object' && parsed.report ? parsed.report : parsed;
-        report = this.normalizeReport(reportRaw, loopNum);
+        report = this.normalizeReport(reportRaw, loopNum, topic);
         gap = this.normalizeGap(parsed?.gap ?? parsed?.gaps);
       }
     } catch (error) {
@@ -222,18 +192,43 @@ ${body}`;
     return { report, gap };
   }
 
-  private fallbackReport(tasks: Task[], loopNum: number): Report {
+  private fallbackReport(tasks: Task[], loopNum: number, topic: string): Report {
     const done = tasks.filter((t) => t.status === 'done' && t.result);
+    const sections: { title: string; content: string }[] = done.map((t) => ({
+      title: t.title,
+      content: t.result ?? '',
+    }));
+
+    // If AI synthesis/research failed (e.g. rate limited), never return a dead
+    // end — compile the raw web sources the swarm already gathered.
+    if (sections.length === 0) {
+      const sourced = tasks.filter((t) => (t.sources?.length ?? 0) > 0);
+      for (const t of sourced) {
+        const content = (t.sources ?? [])
+          .map((s) => (s.snippet ? `- ${s.snippet.replace(/\s+/g, ' ').trim()}` : `- ${s.title}: ${s.url}`))
+          .slice(0, 4)
+          .join('\n');
+        if (content) sections.push({ title: t.title, content });
+      }
+    }
+
     return {
+      title: classifyTopic(topic).title || topic || 'Synth Report',
       summary:
-        done.map((t) => t.title).join(', ') || 'No completed research results were available.',
-      sections: done.map((t) => ({ title: t.title, content: t.result ?? '' })),
+        sections.length > 0
+          ? done.length > 0
+            ? done.map((t) => t.title).join(', ')
+            : 'Compiled directly from the web sources the swarm gathered (AI synthesis was rate-limited).'
+          : 'No completed research results were available.',
+      sections,
       loopsUsed: loopNum,
     };
   }
 
-  private normalizeReport(value: unknown, loopNum: number): Report {
+  private normalizeReport(value: unknown, loopNum: number, topic: string): Report {
     const obj = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+    const title =
+      typeof obj.title === 'string' && obj.title.trim() ? obj.title.trim() : classifyTopic(topic).title;
     const summary = typeof obj.summary === 'string' ? obj.summary : '';
     const raw = Array.isArray(obj.sections) ? obj.sections : [];
     const sections = raw
@@ -242,20 +237,61 @@ ${body}`;
         title: typeof s.title === 'string' ? s.title : 'Section',
         content: typeof s.content === 'string' ? s.content : '',
       }));
-    return { summary, sections, loopsUsed: loopNum };
+    return { title, summary, sections, loopsUsed: loopNum };
   }
 
   private normalizeGap(value: unknown): Gap | undefined {
     if (!value || typeof value !== 'object') return undefined;
     const obj = value as Record<string, unknown>;
     const missing = Array.isArray(obj.missing)
-      ? obj.missing.filter((m): m is string => typeof m === 'string')
+      ? obj.missing
+          .filter((m): m is string => typeof m === 'string')
+          .filter((m) => !this.isGenericGap(m))
+          .slice(0, 3)
       : [];
     if (missing.length === 0) return undefined;
     return {
       missing,
       reasoning: typeof obj.reasoning === 'string' ? obj.reasoning : '',
     };
+  }
+
+  /** Reject vague gap candidates that would loop forever without adding value. */
+  private isGenericGap(text: string): boolean {
+    const t = text.toLowerCase();
+    const generic = [
+      'broader impact',
+      'wider impact',
+      'overall impact',
+      'general impact',
+      'broader',
+      'wider',
+      'more depth',
+      'more detail',
+      'deeper analysis',
+      'further analysis',
+      'further exploration',
+      'more context',
+      'specific context',
+      'subject matter',
+      'other frameworks',
+      'alternatives',
+      'alternative',
+      'future outlook',
+      'future trends',
+      'future developments',
+      'emerging',
+      'real-world applications',
+      'applications beyond',
+      'beyond its current',
+      'as a whole',
+      'a comparison',
+    ];
+    return (
+      t.length < 12 ||
+      generic.some((g) => t.includes(g)) ||
+      /(impact|implications?) on/.test(t)
+    );
   }
 
   /**
@@ -279,7 +315,7 @@ ${body}`;
     this.emit({ type: 'redispatch', taskIds: newTasks.map((t) => t.id), loopNumber: loopNum });
 
     await this.swarmRunner(newTasks);
-    const result = await this.synthesizer(newTasks, loopNum);
+    const result = await this.synthesizer(newTasks, loopNum, topic);
     return result;
   }
 
@@ -292,7 +328,7 @@ ${body}`;
     const allTasks: Task[] = [...plan.tasks];
 
     await this.swarmRunner(plan.tasks);
-    let result = await this.synthesizer(allTasks, 0);
+    let result = await this.synthesizer(allTasks, 0, topic);
 
     let loopNum = 0;
     while (result.gap && result.gap.missing.length > 0 && loopNum + 1 < this.maxLoops) {
@@ -308,7 +344,7 @@ ${body}`;
 
       // Accumulate all tasks and re-synthesize
       allTasks.push(...gapTasks);
-      result = await this.synthesizer(allTasks, loopNum);
+      result = await this.synthesizer(allTasks, loopNum, topic);
     }
 
     const report: Report = {

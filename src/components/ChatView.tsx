@@ -5,7 +5,13 @@ import type { SwarmEvent } from '@/lib/types';
 import type { RunModel } from '@/lib/runModel';
 import { applyEvent, emptyRun } from '@/lib/runModel';
 import { newId } from '@/lib/history';
+import { displayTitle, followUpBase } from '@/lib/topic';
 import Swarm3D from '@/components/Swarm3D';
+
+// Continuation phrases that mean "go deeper on the previous topic" rather than
+// a brand-new research subject. Matched against the whole trimmed input.
+const FOLLOW_UP_RE =
+  /^(explain more|explain further|expound|elaborate|expand on|expand more|elaborate more|go deeper|dive deeper|dive in|break it down|break this down|simplify|make it simpler|clarify|tell me more|more about this|more details?|more|give me more|continue|keep going|keep explaining|so what|is that all|anything else|for example|give examples|and what about|what about it)\s*[!?.]*$/i;
 
 interface Message {
   id: string;
@@ -17,17 +23,17 @@ interface Message {
 }
 
 interface ChatViewProps {
-  provider: 'demo' | 'groq';
   loadedRun?: RunModel | null;
   loadedKey?: string;
+  sessionToken?: number;
   onSaveRun: (run: RunModel, topic: string, events: SwarmEvent[]) => void;
   onActiveRunChange: (run: RunModel | null) => void;
 }
 
 export function ChatView({
-  provider,
   loadedRun,
   loadedKey,
+  sessionToken = 0,
   onSaveRun,
   onActiveRunChange,
 }: ChatViewProps) {
@@ -37,6 +43,12 @@ export function ChatView({
   const [currentRun, setCurrentRun] = useState<RunModel | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const eventsRef = useRef<SwarmEvent[]>([]);
+  const queuedRef = useRef<string | null>(null);
+  const runningRef = useRef(false);
+  // Original (dash-stripped) subject of the last run, so follow-ups like
+  // "explain more" expand against the real topic instead of being searched
+  // as their own subject.
+  const followUpBaseRef = useRef<string | null>(null);
 
   const welcome =
     "Hi! I'm Synth. Give me a topic and I'll dispatch a fleet of parallel agents to research it — then synthesize a full report. Try something like *'state of AI startups in India'*.";
@@ -47,7 +59,12 @@ export function ChatView({
 
   useEffect(() => {
     setMessages(bootMessages());
-  }, []);
+    setCurrentRun(null);
+    setRunning(false);
+    eventsRef.current = [];
+    queuedRef.current = null;
+    followUpBaseRef.current = null;
+  }, [sessionToken]);
 
   // When a run from history is loaded externally, show it as a report message
   useEffect(() => {
@@ -70,11 +87,8 @@ export function ChatView({
     const userMsg: Message | null = loadedRun.topic
       ? { id: `loaded-u-${loadedKey ?? loadedRun.startedAt}`, role: 'user', text: loadedRun.topic, at: loadedRun.startedAt || Date.now() }
       : null;
-    setMessages((prev) => {
-      const base = prev.filter((m) => !m.id.startsWith('loaded-'));
-      const next = userMsg ? [...base, userMsg, reportMsg] : [...base, reportMsg];
-      return next;
-    });
+    // Replace the thread entirely — each history chat is its own conversation.
+    setMessages(userMsg ? [userMsg, reportMsg] : [reportMsg]);
     setCurrentRun(loadedRun);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedKey]);
@@ -97,16 +111,44 @@ export function ChatView({
   };
 
   const launch = async (topicText: string) => {
-    if (!topicText.trim() || running) return;
+    const inputText = topicText.trim();
+    if (!inputText) return;
+
+    // Continuation phrases ("explain more", "go deeper", …) apply to the
+    // previous topic, never as a literal new subject.
+    let text = inputText;
+    if (FOLLOW_UP_RE.test(inputText) && followUpBaseRef.current) {
+      text = `${followUpBaseRef.current} — ${inputText}`;
+    } else if (!FOLLOW_UP_RE.test(inputText)) {
+      followUpBaseRef.current = followUpBase(inputText);
+    }
 
     const sessionId = newId();
 
-    // user message
+    // Register the user's question immediately — never silently drop it.
     setMessages((prev) => [
       ...prev,
-      { id: sessionId + '-u', role: 'user', text: topicText, at: Date.now() },
+      { id: sessionId + '-u', role: 'user', text: inputText, at: Date.now() },
     ]);
     setInput('');
+
+    // If a swarm is still in flight, queue this question and run it after.
+    if (runningRef.current) {
+      queuedRef.current = text;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: sessionId + '-queued',
+          role: 'assistant',
+          text: 'A swarm is still running — I\'ve queued this and will start it as soon as the current one finishes.',
+          kind: 'text',
+          at: Date.now(),
+        },
+      ]);
+      return;
+    }
+
+    runningRef.current = true;
 
     // assistant placeholder
     setMessages((prev) => [
@@ -122,7 +164,7 @@ export function ChatView({
 
     const run: RunModel = {
       ...emptyRun(),
-      topic: topicText,
+      topic: text,
       startedAt: Date.now(),
       running: true,
     };
@@ -136,8 +178,7 @@ export function ChatView({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          topic: topicText,
-          provider,
+          topic: text,
           sessionId,
         }),
       });
@@ -180,14 +221,13 @@ export function ChatView({
 
       const final = runState;
       setCurrentRun((prev) => (prev ? { ...prev, running: false } : prev));
-      setRunning(false);
 
       // promote placeholder to final report
       const reportText =
         final.report?.summary ??
         final.error ??
         'Hmm, the swarm returned without a report. Try a different topic.';
-      const kind = final.error ? 'error' : final.report ? 'report' : 'text';
+      const kind = final.report ? 'report' : final.error ? 'error' : 'text';
 
       setMessages((prev) =>
         prev.map((m) =>
@@ -202,15 +242,27 @@ export function ChatView({
         )
       );
 
-      onSaveRun(final, topicText, eventsRef.current);
+      onSaveRun(final, text, eventsRef.current);
       onActiveRunChange(final);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'swarm failed unexpectedly';
       setMessages((prev) =>
         prev.map((m) => (m.id === sessionId + '-a' ? { ...m, text: msg, kind: 'error' } : m))
       );
-      setCurrentRun((prev) => (prev ? { ...prev, running: false } : prev));
+      const failed: RunModel = { ...run, topic: text, running: false, error: msg };
+      setCurrentRun(failed);
+      // Persist failed/interrupted runs too so they don't silently vanish.
+      onSaveRun(failed, text, eventsRef.current);
+      onActiveRunChange(failed);
+    } finally {
       setRunning(false);
+      runningRef.current = false;
+      // Kick off anything the user queued while this run was in flight.
+      const next = queuedRef.current;
+      if (next) {
+        queuedRef.current = null;
+        void launch(next);
+      }
     }
   };
 
@@ -297,7 +349,7 @@ export function ChatView({
             />
             <button
               type="submit"
-              disabled={!input.trim() || running}
+              disabled={!input.trim()}
               className="disabled:opacity-40 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 via-violet-500 to-fuchsia-500 text-white text-sm font-semibold transition-transform hover:scale-[1.03] active:scale-[0.97]"
             >
               {running ? 'Running…' : 'Send ⚡'}
@@ -341,15 +393,15 @@ function LiveSwarmPanel({ run }: { run: RunModel }) {
         </div>
       </div>
 
-      {active ? (
+      <div className="h-40 flex items-center justify-center">
+        <Swarm3D active className="w-44 h-44" />
+      </div>
+
+      {active && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
           {run.tasks.map((t, i) => (
             <MiniReport key={t.id} task={t} index={i} />
           ))}
-        </div>
-      ) : (
-        <div className="h-32 flex items-center justify-center">
-          <Swarm3D active className="w-40 h-40" />
         </div>
       )}
     </div>
@@ -390,7 +442,7 @@ function MiniReport({ task, index }: { task: RunModel['tasks'][number]; index: n
           A{index + 1}
         </span>
       </div>
-      <div className={`mt-1.5 text-[11px] leading-snug line-clamp-3 ${p.text}`}>{task.title}</div>
+      <div className={`mt-1.5 text-[11px] leading-snug line-clamp-3 ${p.text}`}>{displayTitle(task.title)}</div>
       {task.status === 'working' && task.thinking && (
         <div className="mt-1 font-mono text-[10px] text-cyan-600 dark:text-cyan-400 animate-think">
           {task.thinking}
@@ -416,6 +468,12 @@ function ReportBody({ run }: { run: RunModel }) {
           <span>{run.tasks.filter((t) => t.status === 'done').length} agents</span>
         </div>
       </div>
+
+      {run.report?.title && (
+        <h3 className="text-xl font-bold tracking-tight text-ink mb-2">
+          {run.report.title}
+        </h3>
+      )}
 
       {run.report?.summary && (
         <p className="text-[15px] leading-relaxed text-ink whitespace-pre-wrap">
