@@ -115,6 +115,21 @@ function sourcesToContext(sources: Source[]): string {
     .join('\n\n');
 }
 
+/**
+ * Reasoning models (Qwen3, DeepSeek-R1, GPT-OSS) emit their chain-of-thought
+ * between `<think>` / `<thinking>` tags before the real answer. Strip those
+ * blocks (and any leftover bare tags) so the reasoning never leaks into task
+ * results or the synthesized report.
+ */
+export function stripReasoning(text: string): string {
+  let out = text;
+  out = out.replace(/<think>[\s\S]*?<\/think>/g, '');
+  out = out.replace(/<thinking>[\s\S]*?<\/thinking>/g, '');
+  out = out.replace(/<\/?think>/g, '');
+  out = out.replace(/<\/?thinking>/g, '');
+  return out.trim();
+}
+
 // ---------------------------------------------------------------------------
 // GroqProvider
 // ---------------------------------------------------------------------------
@@ -273,7 +288,7 @@ export class GroqProvider implements LLMProvider {
           const data = await response.json();
           const content = data?.choices?.[0]?.message?.content;
           if (typeof content === 'string' && content.trim()) {
-            return content;
+            return stripReasoning(content);
           }
         }
         lastError = new Error(
@@ -341,7 +356,7 @@ export class GroqProvider implements LLMProvider {
     if (typeof content !== 'string') {
       throw new Error('Groq API returned an unexpected response shape');
     }
-    return content;
+    return stripReasoning(content);
   }
 
   getSystemPrompt(role: string, modelKey?: string): string {

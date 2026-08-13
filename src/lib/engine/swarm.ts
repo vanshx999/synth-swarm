@@ -1,12 +1,13 @@
 import { Task, Plan, Gap, Report, SwarmEvent, SwarmEventCallback, LLMProvider } from '../types';
 import { classifyTopic } from '../topic';
+import { stripReasoning } from '../providers';
 
 /**
  * Extract the first balanced JSON object/array from a blob of LLM output.
- * Strips markdown code fences and tolerates surrounding prose.
+ * Strips markdown code fences, reasoning tags, and tolerates surrounding prose.
  */
 function extractJson(text: string): string | null {
-  const cleaned = text.replace(/```(?:json)?/gi, '');
+  const cleaned = stripReasoning(text).replace(/```(?:json)?/gi, '');
   let start = -1;
   for (let i = 0; i < cleaned.length; i++) {
     if (cleaned[i] === '{' || cleaned[i] === '[') {
