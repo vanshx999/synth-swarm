@@ -338,3 +338,16 @@ body {
   mask-composite: exclude;
   pointer-events: none;
 }
+
+/* ------------------------------------------------------------------------- *
+ * Gap/redispatch alert glow — the key demo moment pulse
+ * ------------------------------------------------------------------------- */
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(251, 191, 36, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.6); }
+}
+.animate-glow {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
